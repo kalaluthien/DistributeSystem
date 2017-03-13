@@ -9,6 +9,9 @@ SNU Distribute System Homework Backup
 ### Specification
 * CPU사양, 시스템 사양을 조사
 * CPU에서 제공하는 여러가지 synchronization operation들을 파악
+  * Compare and Swap
+  * Fetch and Add
+  * Memory Barrier
 
 1. 리포트  
 pdf 파일로 제출
