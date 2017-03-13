@@ -8,11 +8,6 @@ SNU Distribute System Homework Backup
 ## HW1-1
 ### Specification
 * CPU사양, 시스템 사양을 조사
-* CPU에서 제공하는 여러가지 synchronization operation들을 파악
-  * Test and Set
-  * Compare and Swap
-  * Fetch and Add
-  * Memory Barrier
 
 1. 리포트  
 pdf 파일로 제출
@@ -28,6 +23,11 @@ pdf 파일로 제출
 
 ## HW1-2
 ### Specification
+* CPU에서 제공하는 여러가지 synchronization operation들을 파악
+  * Test and Set
+  * Compare and Swap
+  * Fetch and Add
+  * Memory Barrier
 * Operation들의 성능을 측정
 * 하나의 long integer variable을 하나의 core 에서 1,000,000,000회 증가시키는 시간과 여러 개의 core를 사용하고 synchronization을 해서 같이 작업할 경우의 시간 측정
 
