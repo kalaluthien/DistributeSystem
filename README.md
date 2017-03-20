@@ -1,7 +1,7 @@
-# DistributeSystem
+# Distributed System
 ![Prof. Yeom1](https://cse.snu.ac.kr/sites/default/files/styles/scale-width-220/public/node--professor/%EC%97%BC%ED%97%8C%EC%98%81%20%20%EA%B5%90%EC%88%98%EB%8B%98_28%20%2811%29_0.jpg)
 
-SNU Distribute System Homework Backup
+SNU Distributed System Homework by kalaluthien
 
 ---
 
@@ -28,6 +28,7 @@ pdf 파일로 제출
   * Compare and Swap
   * Fetch and Add
   * Memory Barrier
+  * and so on...
 * Operation들의 성능을 측정
 * 하나의 long integer variable을 하나의 core 에서 1,000,000,000회 증가시키는 시간과 여러 개의 core를 사용하고 synchronization을 해서 같이 작업할 경우의 시간 측정
 
