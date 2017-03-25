@@ -43,3 +43,17 @@ pdf 파일로 제출
 **EMAIL 제목**: [분산시스템]HW1-2_학번_이름  
 **EMAIL 주소**: joongsuk@snu.ac.kr  
 **제출기한**: 3월 20일 월요일 23시 59분
+
+---
+
+## HW2
+### Specification
+* The art of multiprocessor programming
+  * 42쪽 연습문제 15
+  * 67쪽 연습문제 27, 28, 31 32
+
+작성한 문서를 pdf 파일로 변환해서 메일에 첨부로 제출
+**파일명**: HW2_학번_이름.pdf (e.g., HW2_2017-12345_나분산.pdf)
+**EMAIL 제목**: [분산시스템]HW2_학번_이름
+**EMAIL 주소**: joongsuk@snu.ac.kr
+**제출기한**: 3월 27일 월요일 23시 59분
