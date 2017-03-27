@@ -21,8 +21,8 @@ class FastPath implements Lock {
   }
 
   public void unlock() {
-  y = -1;
-  lock.unlock();
+    y = -1;
+    lock.unlock();
   }
 }
 ```
