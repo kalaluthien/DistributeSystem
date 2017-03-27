@@ -96,7 +96,7 @@ class VolatileExample {
 ```
 
 ## Exercise 31
-Consider the following rather unusual implementation of a method _m_. In every history, the _i-th_ time a thread calls _m_, the call returns after _2i_ steps. Is this method wait-free, bounded wait-free, or neither?
+Consider the following rather unusual implementation of a method _m_. In every history, the _i-th_ time a thread calls _m_, the call returns after _2<sup>i</sup>_ steps. Is this method wait-free, bounded wait-free, or neither?
 
 ## Exercise 32
 This exercise examines a queue implementation (Figure) whose `enq()` method does not have a linearization point.
