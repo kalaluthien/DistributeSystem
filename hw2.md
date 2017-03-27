@@ -90,7 +90,7 @@ class VolatileExample {
   
   public void reader() {
     if (v == true)
-    int y = 100/x;
+      int y = 100/x;
   }
 }
 ```
