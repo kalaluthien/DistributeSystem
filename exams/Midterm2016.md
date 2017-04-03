@@ -23,30 +23,30 @@
 
 The Peterson Lock
 
-* 'flag[i]' : thread i가 진입하고자 함
-* 'victim' : thread victim은 진입할 수 없음
-* 초기 조건 : 'flag[i] = true', 'victim = i'
-* 진입 조건 : 'flag[j] == faise || victim == j'
-* Concurrent하지 않을 때 : 'flag[j] == false'이므로 진입
-* Concurrent할 때: 'victim'이 하나의 값만 가지므로, thread i와 j 중 하나만 진입
+* `flag[i]` : thread i가 진입하고자 함
+* `victim` : thread victim은 진입할 수 없음
+* 초기 조건 : `flag[i] = true`, `victim = i`
+* 진입 조건 : `flag[j] == faise || victim == j`
+* Concurrent하지 않을 때 : `flag[j] == false`이므로 진입
+* Concurrent할 때: `victim`이 하나의 값만 가지므로, thread i와 j 중 하나만 진입
 
 The Filter Lock
 
-* 'level[i]' : thread i가 진입하고자 하는 최대 level
-* 'victim[j]' : level j에 진입하지 못하는 thread
+* `level[i]` : thread i가 진입하고자 하는 최대 level
+* `victim[j]` : level j에 진입하지 못하는 thread
 * for j = 1 to n - 1
-  * 초기 조건 : 'level[i] = j', 'victim[j] = i'
-  * 진입 조건 : 'for all k != i (level[k] < i || victim[i] != me)'
+  * 초기 조건 : `level[i] = j`, `victim[j] = i`
+  * 진입 조건 : `for all k != i (level[k] < i || victim[i] != me)`
 * level 0에 thread N개 이하, level j에 thread N - j개 이하, level n - 1에 thread 1개 이하 (CS)
-* Concurrent할 때, 마지막으로 'victim[j]'에 write한 thread는level j 아래로 내려갈 수 없음
+* Concurrent할 때, 마지막으로 `victim[j]`에 write한 thread는level j 아래로 내려갈 수 없음
 
 The Bakery Lock
 
-* 'flag[i]' : thread i가 진입하고자 함
-* 'label[i]' : thread i의 label (작을 수록 먼저)
-* 초기 조건 : 'flag[i] = true', 'label[i] = MAX(label[0 : n-1]) + 1'
-* 진입 조건 : 'for all k != i (flag[k] == false || (label[k], k]) >> (lable[i], i))'
-* '(label[i], i)'를 비교하면 label이 겹치더라도 어느 thread가 진입할 것인지 알 수 있음
+* `flag[i]` : thread i가 진입하고자 함
+* `label[i]` : thread i의 label (작을 수록 먼저)
+* 초기 조건 : `flag[i] = true`, `label[i] = MAX(label[0 : n-1]) + 1`
+* 진입 조건 : `for all k != i (flag[k] == false || (label[k], k]) >> (lable[i], i))`
+* `(label[i], i)`를 비교하면 label이 겹치더라도 어느 thread가 진입할 것인지 알 수 있음
 * Overflow의 위험성이 있다.
 
 Bounded Timestamps
@@ -66,7 +66,7 @@ Lower Bounds on the Number of Locations
 
 Sequential Objects
 
-* 'class object = { state, methods }'
+* `class object = { state, methods }`
 * precondition -> side effect -> postcondition
 * 하지만 Concurrent Object는 어렵다
 
@@ -80,9 +80,9 @@ Quiescent Consistency
 * Quiescent Consistency는 _nonblocking_ correctness condition이며 compositinal함
 * 용어 정리
   * total method
-    * 모든 object state에 대해 정의되는 method (ex. 'enq()' if unbounded)
+    * 모든 object state에 대해 정의되는 method (ex. `enq()` if unbounded)
   * partial method
-    * 어떤 object state에 대해 정의되지 않는 method (ex. 'deq()')
+    * 어떤 object state에 대해 정의되지 않는 method (ex. `deq()`)
   * nonblocking
     * total method에 대한 임의의 pending call은 언제나 완료될 수 있음
   * compositinal
@@ -96,9 +96,9 @@ Sequential Consistency
 * Quiescent Consistency와 Sequential Consistency는 incomparable (포함 관계 x)
   * Quiescent Consistency는 quiescent한 구간 전후로만 수행 순서가 보장되므로 program order를 보존하지 않음
   * Sequential Consistency는 real-time order와 무관하므로 object가 quiescent한 구간 전후로 서로 다른 thread의 method 수행 순서가 보장되지 않음
-  * ex1) ('A.enq(x)' call) ('A.enq(x)' return) ('B.enq(y)' call) ('A.deq(y)' call) ('B.enq(y)' return) ('A.deq(y)' return)
+  * ex1) (`A.enq(x)` call) (`A.enq(x)` return) (`B.enq(y)` call) (`A.deq(y)` call) (`B.enq(y)` return) (`A.deq(y)` return)
     * Seq(true), Qui(false)
-  * ex2) ('A.p.enq(x)') ('B.q.enq(y)') ('A.q.enq(x)') ('B.p.enq(y)') ('A.p.deq(y)') ('B.q.deq(x)')
+  * ex2) (`A.p.enq(x)`) (`B.q.enq(y)`) (`A.q.enq(x)`) (`B.p.enq(y)`) (`A.p.deq(y)`) (`B.q.deq(x)`)
     * Seq.p(true), Seq.q(true), Seq(false) : compositinal하지 않음
 * 현대(?)의 멀티프로세서에서 read & write는 sequential consistency하지 않음
 * Sequential Consistency는 _nonblocking_ correctness condition이며 compositinal하지 않음
