@@ -8,3 +8,12 @@
 * MCS Queue Lock와 CHL Queue Lock의 차이점을 말하고 어떤 환경에서 더 적합한지 설명하시오.
 
 ## 시험공부
+### Mutual Exclusion
+
+### Concurrent Object
+
+### Foundations of Shared Memory
+
+### The Relative Power of Primitive Synchronization Operations
+
+### Universality of Concensus
