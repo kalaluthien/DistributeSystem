@@ -217,7 +217,7 @@ Read-Modify-Write Operation
 * register의 기존 값 x를 f(x)로 바꾸고 x(기존 값)를 반환하는 operation
 * `get()` : f(x) = x
 * `get-and-set(v)` : f(x) = v
-  * `test-and-set()' = 'get-and-set(1)'
+  * `test-and-set()` = `get-and-set(1)`
 * `get-and-increment()` : f(x) = x + 1
 * `fetch-and-add(k)` : f(x) = x + k
 * `compare-and-set(e, u)` : f(x) = if (x == e) then u else x
