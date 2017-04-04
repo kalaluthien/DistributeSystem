@@ -59,15 +59,17 @@ Bounded Timestamps
 
 Lower Bounds on the Number of Locations
 
-* Deadlock-free Lock algorithm은 최악의 경우 최소 n개의 서로 다른 메모리를 할당하고 접근해야함
+* thread가 n개일 대, Deadlock-free Lock algorithm은 최악의 경우 최소 n개의 서로 다른 메모리를 할당하고 접근해야함
 * 따라서 기본적인 load store instruction  대신 synchronization operation이 필요함
 
 ### 3. Concurrent Object
 
 Sequential Objects
 
-* `class object = { state, methods }`
+* **Principle** Method calls should appear to happen in a one-at-a-time, sequential order
+* Object는 다음과 같이 이야기할 수 있음: `class object = { state, methods }`
 * precondition -> side effect -> postcondition
+* invocation -> interval(method call) -> response
 * 하지만 Concurrent Object는 어렵다
 
 Quiescent Consistency
@@ -109,7 +111,7 @@ Linearizability
 * **Principle** Each method call should appear to take effect instantaneously at some moment between its invocation and responce
 * 서로 겹치지 않는 concurrent method call은 그 순서로 실행되고(program order는 저절로 보존), 서로 겹치는 concurrent method call은 object의 sequential specification을 만족하도록 하는 순서로 실행되어, 전체 History가 그와 동등한 어떤 sequential execution order가 있어야 함
 * 모든 liniearizable execution은 sequentially consistent함 (역은 성립하지 않음) -> moment를 기준으로 sequential order를 매기면 됨
-* method가 side effect를 내는 liniearization point를 찾아야 함 (object의 state가 바뀌는 순간)
+* method가 side effect를 내는 linearization point를 찾아야 함 (object의 state가 바뀌는 순간)
   * Lock 있음: critical section
   * Lock 없음: a single step
 * Linearizability는 _nonblocking_ correctness condition이며 compositinal함
@@ -118,6 +120,7 @@ Progress Conditions
 
 * Blocking
   * 한 thread의 unexpected delay가 다른 thread들이 progress하지 못하게 할 수 있으면 blocking implementation
+  * ex) Mutual-exclusion
 * Wait-free
   * 모든 method call이 유한한 step 후에 종료되는것이 보장되는 경우
   * thread의 수와 무관한 wait-free method를 population-oblivious라고 함
@@ -128,7 +131,11 @@ Progress Conditions
 * Lock-free
   * 어떤 method call이 유한한 step 후에 종료되는 것이 (무한히) 보장되는 경우
   * Wait-free -> Lock-free (역은 성립하지 않음)
+  * 만약 execution이 finite하다면 wait-free = lock-free
   * 일부 thread는 starcation을 겪을 수 있으나, 실제로는 거의 일어나지 않는다면 wait-free보다 실용적일 수 있음
+* Lock-free : Wait-free = Deadlock-free : Starvation-free
+  * Lock-free & Deadlock-free는 전체 thread group의 progress를 보장
+  * Wait-free & Starvation-free는 개별 thread의 process을 보장
 
 ### 4. Foundations of Shared Memory
 
@@ -142,21 +149,84 @@ Read-Write Register
     * W<sup>i</sup> -> W<sup>j</sup> -> R<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 과거에 덮어쓰인 값을 읽는 경우)
   * Atomic의 조건
     * 더불어, R<sup>i</sup> -> R<sup>j</sup>일 때 i > j 인 경우는 존재하지 않음
+* Weakest Register : SRSW Safe Boolean
+  * 여기서부터 모든 다른 register(MRMW Atomic M-valued까지)를 구성할 수 있음
+  * 하지만 Consensus hierarchy를 뛰어넘을 수는 없다
+* SRSW Safe -> MRSW Safe
+  * 각 reader마다 SRSW를 하나씩 할당하면 MRSW가 됨
+* MRSW Safe Boolean -> MRSW Regular Boolean
+  * 할당되어 있는 값과 바꿀 값이 동일하면 write하지 않음
+* MRSW Regular Boolean -> MRSW Regular M-valued
+  * MRSW를 M+1개 두고 `read()` 수행시 reader는 0 to M, `write(x)` 수행시 writer는 x to 0로 scan함
+* MRSW Regular -> SRSW Atomic
+  * writer는 `value:stamp`를 write, reader는 마지막으로 읽은 `value:stamp`를 저장하여 stamp가 최신인 것을 read
+* SRSW Atomic -> MRSW Atomic
+  * SRSW를 (thread 수)<sup>2</sup>만큼 할당 (thread[0] = writer, thread[1:n] = reader)
+  * writer: column 0에 순서대로 write
+  * reader: row i의 최신값을 읽고, column i에 순서대로 write
+  * 이렇게 하면 다른 reader가 읽은 값을 놓치는 경우는 (read 시간 역전) 두 read가 겹쳤을 때 뿐이므로 문제가 없음
+* MRSW Atomic -> MRMW Atomic
+  * Bakery algorithm과 거의 동일함
+  * MRSW를 writer 수만큼 할당
+  * writer: array를 다 읽고 timestamp를 뽑아서 자기 자리에 write
+  * reader: array를 다 읽고 timestamp가 최신인 것을 read
+  * timestamp 받는 부분이 write order의 linearization point
+  * max stamp 읽는 부분이 read order의 linearization point
+  * 따라서 특정 code line이 linearization point가 아니고 실행에 따라 다름
+* Atomic Snapshot
+  * **update**(한 array element에 write) & **scan**(모든 array element를 read)
+  * _clean double collect_: linearizable하지 않음 & **scan**이 wait-free가 아니어서 starvation을 겪을 수 있음
+  * wait-free snapshot: **update**에서도 **scan**을 함
 
 ### 5. The Relative Power of Primitive Synchronization Operations
 
+Consensus Number
 
+* object가 consensus 문제를 해결할 수 있는 최대 thread 수
+* consensus number가 N 이하인 object를 이용해서 consensus number가 N인 wait-free(or lock-free)한 object를 만들 수 없음
+  * There is no wait-free implementation of n-thread consensus from read-write registers
+  * -> Asynchronous computability different from Turing computability
+* concurrent consensus object
+  * `object.decide(input)`의 output은 다음 조건을 만족함
+  * _consistent_ : 모든 thread가 같은 값을 decide
+  * _valid_ : decide된 값은 어떤 thread의 input
+  * `decide()`애 의해 처음으로 선택된 thread를 기준으로 해서 sequential consensus object으로 linearizable
+* consensus number 비교
+  * Atomic read-write register는 1
+  * Multi-dequeuer FIFO queue는 n 이상 (맨 처음 `deq()`한 thread의 값으로 decide)
+  * (n, n(n+1)/2)-Assignment Object는 n 이상 (총 n(n+1)/2 register에 n개를 동시에 write해서 덮어쓰인 쪽이 우선)
+  * X로 Y를 구현했다면, n(X) ≥ n(Y)
 
+Consensus protocol
 
+* decide를 위한 protocol의 state transition을 binary tree 형태로 나타냄 (edge: move, node: state)
+  * **bivalent** 어느 값이든 가능
+    * **critical state** 다음 move에 따라 0-valent 또는 1-valent로 나뉘는 bivalent
+    * protocol이 wait-free이면 언젠가는 critical state에 도달해야 함
+  * **univalent** 한 가지 값만 가능 (그 값이 무엇인지는 모를 수 있음)
+    * **x-valent** x만 가능 (ex. 0-valent, 1-valent)
+  * protocol의 모순으로부터 Atomic register로는 (n > 1) consensus 문제를 풀 수 없음을 증명
+    * A가 read할 때
+    * A는 r0, r1 순서로, B는 r1, r0 순서로 write할 때
+    * A와 B가 모두 r에 write할 때
+  * 그러므로 load & store instruction 말고 다른 synchronization operation이 필요한 것
+  * FIFO Queue, n-assignment 등은 RMW instruction (혹은 RMW register)를 이용하여 구현해야 함
 
+Read-Modify-Write Operation
 
-
-
-
-### 6. Universality of Concensus
-
-
-
-
-
-
+* register의 기존 값 x를 f(x)로 바꾸고 x(기존 값)를 반환하는 operation
+* `get()` : f(x) = x
+* `get-and-set(v)` : f(x) = v
+  * `test-and-set()' = 'get-and-set(1)'
+* `get-and-increment()` : f(x) = x + 1
+* `fetch-and-add(k)` : f(x) = x + k
+* `compare-and-set(e, u)` : f(x) = if (x == e) then u else x
+  * 단, `compare-and-set(e, u)`는 x(기존 값)를 반환하지 않고 교체 여부를 반환함
+* nontrivial한 RMW register는 consensus number가 2 이상임 (Atomic register로는 불가능하므로 hardware에서 RMW method를 지원해야 함)
+  * `if (rmw(..) == init)`로 비교하여 i와 1-i 중 `decide()`할 수 있음
+  * 그러나 어떤 `rmw(...)`는 thread가 셋 이상일 때 누가 이겼는지 알 수 없음 (자기가 이겼는지 여부와 누가 이겼는지 여부를 다 알아야함)
+* Commute | Overwrite RMW object는 consensus number가 2임 -> "weak" RMW instruction
+  * commute: f(g(v)) = g(f(v))
+  * overwrite: f(g(v)) = f(v)
+  * 누가 이겼는지 알 수 없다는 것을 binary tree를 이용해서 증명 (thread A, B, C)
+* `CAS(e, u)`는 consensus number가 ∞ (자기가 이겼는지를 return 값으로, 누가 이겼는지를 register 값으로)
