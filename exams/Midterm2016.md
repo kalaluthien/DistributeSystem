@@ -127,13 +127,14 @@ Progress Conditions
   * thread의 수와 무관한 wait-free method를 population-oblivious라고 함
   * 모든 method가 wait-free인 object를 wait-free, 모든 instance가 wait-free인 class를 wait-free라고 함
 * Bounded wait-free
-  * method call의 step에 bound가 있는 경우
+  * method call의 step에 pre-determined bound가 있는 경우
+  * Bounded wait-free -> (unbounded) Wait-free이므로 bounded wait-free가 더 강력한 조건
   * bound가 thread의 수에 의존하는 경우도 있음
 * Lock-free
-  * 어떤 method call이 유한한 step 후에 종료되는 것이 (무한히) 보장되는 경우
-  * Wait-free -> Lock-free (역은 성립하지 않음)
-  * 만약 execution이 finite하다면 wait-free = lock-free
-  * 일부 thread는 starcation을 겪을 수 있으나, 실제로는 거의 일어나지 않는다면 wait-free보다 실용적일 수 있음
+  * 어떤 method call이 유한한 step 후에 종료되는 것이 항상 보장되는 경우
+  * Wait-free -> Lock-free 이므로 wait-free가 더 강력한 조건
+  * 만약 실행이 유한하다면 wait-free = lock-free (항상 어떤 method call이 유한한 step 후에 종료해야 하므로)
+  * 일부 thread는 starvation을 겪을 수 있으나, 실제로는 거의 일어나지 않는다면 wait-free보다 실용적일 수 있음
 * Lock-free : Wait-free = Deadlock-free : Starvation-free
   * Lock-free & Deadlock-free는 전체 thread group의 progress를 보장
   * Wait-free & Starvation-free는 개별 thread의 process을 보장
@@ -142,14 +143,13 @@ Progress Conditions
 
 Read-Write Register
 
-* SRSW - MRSW - MRMW
-* Boolean - Multi-valued
+* SRSW - MRSW - MRMW, Boolean - M-valued
 * Safe - Regular - Atomic
   * Regular의 조건
     * R<sup>i</sup> -> W<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 미래에 쓰인 값을 읽는 경우)
     * W<sup>i</sup> -> W<sup>j</sup> -> R<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 과거에 덮어쓰인 값을 읽는 경우)
   * Atomic의 조건
-    * 더불어, R<sup>i</sup> -> R<sup>j</sup>일 때 i > j 인 경우는 존재하지 않음
+    * 위의 조건과 더불어, R<sup>i</sup> -> R<sup>j</sup>일 때 i > j 인 경우는 존재하지 않음
 * Weakest Register : SRSW Safe Boolean
   * 여기서부터 모든 다른 register(MRMW Atomic M-valued, Atomic Snapshot, etc)를 구성할 수 있음
   * 하지만 Consensus hierarchy를 뛰어넘을 수는 없음 (concensus number = 1)
@@ -158,22 +158,21 @@ Read-Write Register
 * MRSW Safe Boolean -> MRSW Regular Boolean
   * 할당되어 있는 값과 바꿀 값이 동일하면 write하지 않음
 * MRSW Regular Boolean -> MRSW Regular M-valued
-  * MRSW를 M+1개 두고 `read()` 수행시 reader는 0 to M, `write(x)` 수행시 writer는 x to 0로 scan함
+  * MRSW를 M개 두고 `read()` 수행시 reader는 0 to M-1, `write(x)` 수행시 writer는 x to 0로 scan함
 * MRSW Regular -> SRSW Atomic
   * writer는 `value:stamp`를 write, reader는 마지막으로 읽은 `value:stamp`를 저장하여 stamp가 최신인 것을 read
 * SRSW Atomic -> MRSW Atomic
-  * SRSW를 (thread 수)<sup>2</sup>만큼 할당 (thread[0] = writer, thread[1:n] = reader)
-  * writer: column 0에 순서대로 write
-  * reader: row i의 최신값을 읽고, column i에 순서대로 write
+  * SRSW를 (thread 수)<sup>2</sup>만큼 할당 (thread[0] = writer, thread[1:n] = reader) 구현에 따라서는 (reader 수)<sup>2</sup>면 충분
+  * **writer**: column 0에 순서대로 write (또는, 대각선으로 write)
+  * **reader**: row i의 최신값을 읽고, column i에 순서대로 write
   * 이렇게 하면 다른 reader가 읽은 값을 놓치는 경우는 (read 시간 역전?) 두 read가 겹쳤을 때 뿐이므로 문제가 없음
 * MRSW Atomic -> MRMW Atomic
   * Bakery algorithm과 거의 동일함
   * MRSW를 writer 수만큼 할당
-  * writer: array를 다 읽고 timestamp를 뽑아서 자기 자리에 write
-  * reader: array를 다 읽고 timestamp가 최신인 것을 read
-  * timestamp 받는 부분이 write order의 linearization point
-  * max stamp 읽는 부분이 read order의 linearization point
-  * 따라서 특정 code line이 linearization point가 아니고 실행에 따라 다름
+  * **writer**: array를 다 읽고 timestamp를 뽑아서 자기 자리에 write
+  * **reader**: array를 다 읽고 timestamp가 최신인 것을 read
+  * timestamp 받는 부분이 _write order_의 linearization point, max stamp 읽는 부분이 _read order_의 linearization point
+  * -> 특정 code line이 linearization point가 아니고 실행에 따라 다름
 * Atomic Snapshot
   * **update**(한 array element에 write) & **scan**(모든 array element를 read)
   * _clean double collect_: linearizable하지 않음 & **scan**이 wait-free가 아니어서 starvation을 겪을 수 있음
@@ -207,11 +206,9 @@ Consensus protocol
   * **univalent** 한 가지 값만 가능 (그 값이 무엇인지는 모를 수 있음)
     * **x-valent** x만 가능 (ex. 0-valent, 1-valent)
   * protocol의 모순으로부터 Atomic register로는 (n > 1) consensus 문제를 풀 수 없음을 증명
-    * A가 read할 때
-    * A는 r0, r1 순서로, B는 r1, r0 순서로 write할 때
-    * A와 B가 모두 r에 write할 때
-  * 그러므로 load & store instruction 말고 다른 synchronization operation이 필요한 것
-  * FIFO Queue, n-assignment 등은 RMW instruction (혹은 RMW register)를 이용하여 구현해야 함
+    * A가 read할 때 (A는 read만 하거나 안 하거나 했는데 결과가 달라짐)
+    * A는 r0에, B는 r1에 write할 때 (A와 B가 다른데 썼는데 순서에 따라 결과가 달라짐)
+    * A와 B가 모두 r에 write할 때 (B는 무조건 쓴다고 하면 덮어썼는데 결과가 달라짐)
 
 Read-Modify-Write Operation
 
@@ -231,3 +228,4 @@ Read-Modify-Write Operation
   * overwrite: f(g(v)) = f(v)
   * n > 2일 때, 누가 이겼는지 알 수 없다는 것을 binary tree를 이용해서 증명 (thread A, B, C)
 * `CAS(e, u)`는 consensus number가 ∞ (자기가 이겼는지를 return 값으로, 누가 이겼는지를 register 값으로 판단)
+* FIFO Queue, n-assignment 등은 RMW instruction (혹은 RMW register)를 이용하여 구현해야 함
