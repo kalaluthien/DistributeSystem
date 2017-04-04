@@ -132,16 +132,16 @@ Progress Conditions
 
 ### 4. Foundations of Shared Memory
 
+Read-Write Register
 
-
-
-
-
-
-
-
-
-
+* SRSW - MRSW - MRMW
+* Boolean - Multi-valued
+* Safe - Regular - Atomic
+  * Regular의 조건
+    * R<sup>i</sup> -> W<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 미래에 쓰인 값을 읽는 경우)
+    * W<sup>i</sup> -> W<sup>j</sup> -> R<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 과거에 덮어쓰인 값을 읽는 경우)
+  * Atomic의 조건
+    * 더불어, R<sup>i</sup> -> R<sup>j</sup>일 때 i > j 인 경우는 존재하지 않음
 
 ### 5. The Relative Power of Primitive Synchronization Operations
 
