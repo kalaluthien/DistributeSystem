@@ -2,11 +2,19 @@
 ![Yoem](http://eng.snu.ac.kr/sites/default/files/professor/20100122135859.jpg)
 
 ## 기출문제
-* Test-and-set로 mutual exclusion 을 해결할 수 있지만 n-thread consensus는 해결할 수 없다. 차이점과 해결할 수 없는 이유를 설명하시오.
-* Wait-free와 Lock-free의 차이점을 설명하시오.
-* Bounded timestamping system (**T(k) = T(2) * T(k-1)**)이 concurrent한 환경에서 제대로 동작 안 하는 경우가 있다. Compare-and-set을 이용하여 **T(3)** 에서 thread들이 concurrent하게 동작할 수 잇도록 timestamp를 만드는 방법을 제시하시오. (Wait-free하도록)
-* Linearizability와 Sequential consistency중 누가 더 강력한 조건인지 설명하고, 둘 중 하나는 만족하지만 다른 하나는 만족하지 못하는 예시를 드시오.
-* MCS Queue Lock와 CHL Queue Lock의 차이점을 말하고 어떤 환경에서 더 적합한지 설명하시오.
+1. Test-and-set로 mutual exclusion을 해결할 수 있지만 n-thread consensus는 해결할 수 없다. 차이점과 해결할 수 없는 이유를 설명하시오.
+1. Wait-free와 Lock-free의 차이점을 설명하시오.
+1. Bounded timestamping system (**T(k) = T(2) * T(k-1)**)이 concurrent한 환경에서 제대로 동작 안 하는 경우가 있다. Compare-and-set을 이용하여 **T(3)** 에서 thread들이 concurrent하게 동작할 수 있도록 timestamp를 만드는 방법을 제시하시오. (Wait-free하도록)
+1. Linearizability와 Sequential consistency중 누가 더 강력한 조건인지 설명하고, 둘 중 하나는 만족하지만 다른 하나는 만족하지 못하는 예시를 드시오.
+1. MCS Queue Lock와 CHL Queue Lock의 차이점을 말하고 어떤 환경에서 더 적합한지 설명하시오.
+
+## 시험복기
+1. Bounded timestamping system은 sequential하게 작동할 때는 consistent하지만 concurrent하게 작동할 때는 inconsistent할 때가 있다. **T(3)**에 thread 0, 1, 2가 각각 22, 11, 10에 있을 때 inconsistent해지는 경우가 2가지 있다. 이때의 스케줄을 보이시오. (이 순간 어떤 스레드든 next-TS()는 20임)
+  * i = 자신의 tid; j = (i + 1) % 3; k = (i + 2) % 3; read TS(i); read TS(j); read TS(k); calc next-TS(); set TS(i);
+1. Atomic-2-assignment를 이용하면 2-thread consensus를 해결할 수 있다. 이를 이용해서 다음과 같이 4-thread consensus를 해결하려고 한다. 스레드를 2개씩 묶어서 경쟁하고 다음 단계에 이긴 스레드끼리 승자를 정한다. 이것이 가능한지 불가능한지 설명하시오.
+1. 가장 간단한 Safe, SRSW, Boolean Register를 이용해서 Atomic, 3-reader/3-writer 4-bit Register를 만들 때 필요한 레지스터의 수를 구하시오.
+1. Filter Lock을 사용하고 thread 1, 2, 3이 있을 때, thread 1이 thread 2, 3에 2번, 3번, 4번 추월당하는 예시를 드시오.
+1. Filter Lock이 Wait-free인지 아닌지 보이시오.
 
 ## 시험공부
 ### 2. Mutual Exclusion
@@ -36,7 +44,7 @@ The Filter Lock
 * `victim[j]` : level j에 진입하지 못하는 thread
 * for j = 1 to n - 1
   * 초기 조건 : `level[i] = j`, `victim[j] = i`
-  * 진입 조건 : `for all k != i (level[k] < j || victim[j] != i)`
+  * 진입 조건 : `for all k != i (level[k] < j) || victim[j] != i`
 * level 0에 thread N개 이하, level j에 thread N - j개 이하, level n - 1에 thread 1개 이하 (CS)
 * Concurrent할 때, 마지막으로 `victim[j]`에 write한 thread는 level j 아래로 내려갈 수 없음
 
@@ -96,7 +104,7 @@ Sequential Consistency
 * (1) 각 thread 내에서의 program order를 보존하고 (2) object의 sequential specification을 만족하는 어떤 sequential execution order가 존재
 * Quiescent Consistency와 Sequential Consistency는 incomparable (포함 관계 x)
   * Quiescent Consistency는 quiescent한 구간 전후로만 수행 순서가 보장되므로 program order를 보존하지 않음
-  * ex) \['A.enq(x)' call\] \['B.enq(y)' call\] \['A.enq(x)' return\] \['A.enq(z)' call\] \['B.enq(y)' return\] \['A.enq(z)' return\] \['A.deq(z)'\]
+  * ex) \[`A.enq(x)` call\] \[`B.enq(y)` call\] \[`A.enq(x)` return\] \[`A.enq(z)` call\] \[`B.enq(y)` return\] \[`A.enq(z)` return\] \[`A.deq(z)`\]
     * sequential consistent = `false`, quiescent consistent = `true`
   * Sequential Consistency는 real-time order와 무관하므로 object가 quiescent한 구간 전후로 서로 다른 thread의 method 수행 순서가 보장되지 않음
   * ex) \[`A.enq(x)`\] \[`B.enq(y)` call\] \[`A.deq(y)` call\] \[`B.enq(y)` return\] \[`A.deq(y)` return\]
