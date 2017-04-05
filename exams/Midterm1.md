@@ -9,14 +9,13 @@
 1. MCS Queue Lock와 CHL Queue Lock의 차이점을 말하고 어떤 환경에서 더 적합한지 설명하시오.
 
 ## 시험복기
-1. Bounded timestamping system은 sequential하게 작동할 때는 consistent하지만 concurrent하게 작동할 때는 inconsistent할 때가 있다. **T(3)**에 thread 0, 1, 2가 각각 22, 11, 10에 있을 때 inconsistent해지는 경우가 2가지 있다. 이때의 스케줄을 보이시오. (이 순간 어떤 스레드든 next-TS()는 20임)
-
-```
+``` C
 i = Thread.Id(); j = (i + 1) % 3; k = (i + 2) % 3;
 read TS(i); read TS(j); read TS(k);
 calc next-TS(); update TS(i);
 ```
 
+1. Bounded timestamping system은 sequential하게 작동할 때는 consistent하지만 concurrent하게 작동할 때는 inconsistent할 때가 있다. **T(3)** 에 thread 0, 1, 2가 각각 22, 11, 10에 있을 때 inconsistent해지는 경우가 2가지 있다. 이때의 스케줄을 보이시오. (이 순간 어떤 스레드든 next-TS()는 20임)
 1. Atomic-2-assignment를 이용하면 2-thread consensus를 해결할 수 있다. 이를 이용해서 다음과 같이 4-thread consensus를 해결하려고 한다. 스레드를 2개씩 묶어서 경쟁하고 다음 단계에 이긴 스레드끼리 승자를 정한다. 이것이 가능한지 불가능한지 설명하시오.
 1. 가장 간단한 Safe, SRSW, Boolean Register를 이용해서 Atomic, 3-reader/3-writer 4-bit Register를 만들 때 필요한 레지스터의 수를 구하시오.
 1. Filter Lock을 사용하고 thread 1, 2, 3이 있을 때, thread 1이 thread 2, 3에 2번, 3번, 4번 추월당하는 예시를 드시오.
@@ -68,8 +67,7 @@ Bounded Timestamps
 * T<sup>2</sup> : 0 < 1 < 2 < 0
 * T<sup>k</sup> = T<sup>2</sup> * T<sup>k-1</sup>
   * T<sup>n</sup>는 n-1개의 digit이 있고, n-thread bounded sequential timestamping system의 basis
-  * T<sup>3</sup> : 00 < 01 < 02 < 10 < 11 < 12 < 20 < 21 < 22 < 00
-* 낮은 자리를 먼저 증가시키되, 해당 subgraph가 가득 차게 되면 높은 자리에서 다시 수행
+  * T<sup>3</sup> : (00 < 01 < 02 < 00) < (10 < 11 < 12 < 10) < (20 < 21 < 22 < 00) < (00 < 01 < 02 < 00)
 
 Lower Bounds on the Number of Locations
 
@@ -77,13 +75,6 @@ Lower Bounds on the Number of Locations
 * 따라서 기본적인 load & store instruction  대신 synchronization operation이 필요함
 
 ### 3. Concurrent Object
-
-Sequential Objects
-
-* Object는 다음과 같이 정의할 수 있음: `class object = { state, methods }`
-* precondition -> side effect -> postcondition
-* invocation -> interval(method call) -> response
-* 하지만 Concurrent Object는 어렵다
 
 Quiescent Consistency
 
@@ -185,8 +176,8 @@ Read-Write Register
   * MRSW를 writer 수만큼 할당
   * **writer**: array를 다 읽고 timestamp를 뽑아서 자기 자리에 write
   * **reader**: array를 다 읽고 timestamp가 최신인 것을 read
-  * timestamp 받는 부분이 _write order_의 linearization point, max stamp 읽는 부분이 _read order_의 linearization point
-  * -> 특정 code line이 linearization point가 아니고 실행에 따라 다름
+  * timestamp 받는 부분이 write order의 linearization point, max stamp 읽는 부분이 read order의 linearization point
+    * 특정 code line이 linearization point가 아니고 실행에 따라 다름
 * Atomic Snapshot
   * **update**(한 array element에 write) & **scan**(모든 array element를 read)
   * _clean double collect_: linearizable하지 않음 & **scan**이 wait-free가 아니어서 starvation을 겪을 수 있음
