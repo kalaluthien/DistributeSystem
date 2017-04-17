@@ -189,13 +189,14 @@
   * `CAS(e, u)`는 x(기존 값)를 반환하지 않고 교체 여부(bool)를 반환함
 * nontrivial한 RMW register는 consensus number가 2 이상임 (Atomic register로는 불가능하므로 hardware에서 RMW method를 지원해야 함)
   * `if (rmw(..) == init)`로 비교하여 i와 1-i 중 `decide()`할 수 있음
+    * running thread는 상대 thread가 sleep하더라도 `decide()`할 수 있어야 함
   * 그러나 어떤 `rmw(...)`는 thread가 셋 이상일 때 누가 이겼는지 알 수 없음 (자기가 이겼는지 여부와 누가 이겼는지 여부를 다 알아야함)
 * Commute & Overwrite RMW object는 consensus number가 2임 ("weak" RMW instruction)
   * commute: f(g(v)) = g(f(v))
   * overwrite: f(g(v)) = f(v)
   * n > 2일 때, 누가 이겼는지 알 수 없다는 것을 binary tree를 이용해서 증명 (thread A, B, C)
 * `CAS(e, u)`는 consensus number가 ∞ (자기가 이겼는지를 return 값으로, 누가 이겼는지를 register 값으로 판단)
-* FIFO Queue, n-assignment 등은 RMW instruction (혹은 RMW register)를 이용하여 구현해야 함
+* FIFO Queue, n-assignment 등은 consensus number가 충분한 RMW instruction (혹은 RMW register)를 이용하여 구현해야 함
 
 # 6. Universality of Consensus
 
