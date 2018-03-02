@@ -5,7 +5,7 @@ SNU Distributed System Homework by kalaluthien
 
 ---
 
-## HW1-1
+## HW1-1 (outdated)
 ### Specification
 * CPU사양, 시스템 사양을 조사
 
@@ -21,7 +21,7 @@ pdf 파일로 제출
 
 ---
 
-## HW1-2
+## HW1-2 (outdated)
 ### Specification
 * CPU에서 제공하는 여러가지 synchronization operation들을 파악
   * Test and Set
@@ -46,7 +46,7 @@ pdf 파일로 제출
 
 ---
 
-## HW2
+## HW2 (outdated)
 ### Specification
 * The art of multiprocessor programming
   * 42쪽 연습문제 15
@@ -60,7 +60,7 @@ pdf 파일로 제출
 
 ---
 
-## HW 3
+## HW 3 (outdated)
 ### Specification
 * n개의 thread로 shared counter를 1억까지 증가시키는데 걸리는 시간을 아래의 synchronization operation들을 이용해서 측정하라. 
   - *Test and set*
