@@ -6,7 +6,7 @@
 1. Wait-free와 Lock-free의 차이를 설명하시오.
 1. TAS나 CAS가 없는 경우에 64-bit write 연산을 사용해서 consensus를 할 수도 있다. (multiple-assignment를 흉내내면 된다) 이때 최대 consensus number가 얼마가 되겠는지 보이시오. (write granularity나 alignment 같은 가정을 정확히 하시오)
 1. Register의 종류는 (SRSW, MRSW, MRMW) (B, MV), (safe, regular, atomic)의 조합으로 모두 18가지가 있을 수 있다. 이중에서 Boolean을 무시하면 9가지인데, 이들 사이의 관계를 도식하시오. *(reader의 수는 m, writer의 수는 n, value의 가짓수는 k)*
-1. Bounded timestamping system **T(3)**은 thread들이 concurrent하게 돌아갈 때 더 이상 순서를 정할 수 없는 상황이 발생할 수 있다. CAS instruction을 사용하여 concurrent하게 돌아가더라도 항상 순서를 정할 수 있도록 timestamp를 만드는 방법을 제시하시오.
+1. Bounded timestamping system **T(3)** 은 thread들이 concurrent하게 돌아갈 때 더 이상 순서를 정할 수 없는 상황이 발생할 수 있다. CAS instruction을 사용하여 concurrent하게 돌아가더라도 항상 순서를 정할 수 있도록 timestamp를 만드는 방법을 제시하시오.
 
 ## 2016 기출 (중간고사)
 1. Test-and-set로 mutual exclusion을 해결할 수 있지만 n-thread consensus는 해결할 수 없다. 차이점과 해결할 수 없는 이유를 설명하시오.
