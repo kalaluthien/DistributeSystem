@@ -28,7 +28,7 @@ pdf 파일로 제출
 리포트를 하나의 파일로 압축해서 메일로 제출  
 **압축파일명**: HW1-1\_학번\_이름.zip (e.g., HW1-1\_2017-26932\_김형모.zip)  
 **EMAIL 제목**: [분산시스템]HW1\_학번\_이름  
-**EMAIL 주소**: hanggicrown@gmail.com 
+**EMAIL 주소**: hanggicrown@gmail.com  
 **제출기한**: 3월 14일 수요일 23시 59분
 
 ---
