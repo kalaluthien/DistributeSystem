@@ -3,7 +3,7 @@
 
 SNU Distributed System Course Homework & Exam Backup by Hyungmo Kim
 
-**DO NOT COPY THE HOMEWORKS**
+**DO NOT COPY THE HOMEWORK**
 
 ---
 
@@ -15,7 +15,7 @@ SNU Distributed System Course Homework & Exam Backup by Hyungmo Kim
   * Compare and Swap
   * Fetch and Add
   * Memory Barrier
-  * and so on...
+  * etc
 * Operation들의 성능을 측정
 * 하나의 long integer variable을 하나의 core 에서 1,000,000,000회 증가시키는 시간과 여러 개의 core를 사용하고 synchronization을 해서 같이 작업할 경우의 시간 측정
 
@@ -25,14 +25,10 @@ SNU Distributed System Course Homework & Exam Backup by Hyungmo Kim
 pdf 파일로 제출
 
 3. 제출 방식  
-리포트를 하나의 파일로 압축해서 메일로 제출
-
-**파일명**: HW1-1\_학번\_이름.zip (e.g., HW1-1\_2017-26932\_김형모.zip)
-
-**EMAIL 제목**: [분산시스템]HW1\_학번\_이름
-
-**EMAIL 주소**: hanggicrown@gmail.com
-
+리포트를 하나의 파일로 압축해서 메일로 제출  
+**파일명**: HW1-1\_학번\_이름.zip (e.g., HW1-1\_2017-26932\_김형모.zip)  
+**EMAIL 제목**: [분산시스템]HW1\_학번\_이름  
+**EMAIL 주소**: hanggicrown@gmail.com  
 **제출기한**: 3월 14일 수요일 23시 59분
 
 ---
