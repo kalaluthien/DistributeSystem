@@ -8,25 +8,28 @@
 * Starvation-free (= _lockout freedom_)
   * Lock을 얻으려하는 모든 스레드는 언젠가 Lock을 얻게 된다.
   * Starvation-free이면 Deadlock-free이다.
+* Fairness
+  * Overtake 횟수가 제한된다.
 
 ## The Peterson Lock
 * `flag[i]` : thread i가 진입하고자 함
-* `victim` : thread victim은 진입할 수 없음
-* 초기 조건 : `flag[i] = true`, `victim = i`
-* 진입 조건 : `flag[j] == faise || victim == j`
+* `victim` : victim에 해당하는 thread는 진입할 수 없음
+* 초기 조건 : `flag[i] = true` 이고 `victim = i`
+* 진입 조건 : `flag[j] == faise` 또는 `victim == j`
 * Concurrent하지 않을 때 : `flag[j] == false`이므로 진입
 * Concurrent할 때: `victim`이 하나의 값만 가지므로, thread i와 j 중 하나만 진입
 
 ## The Filter Lock
-* `level[i]` : thread i가 진입하고자 하는 최대 level
-* `victim[j]` : level j에 진입하지 못하는 thread
-* for j = 1 to n - 1
-  * 초기 조건 : `level[i] = j`, `victim[j] = i`
-  * 진입 조건 : `for all k != i (level[k] < j) || victim[j] != i`
+* `level[i]` : thread i가 진입하고자 하는 level
+* `victim[j]` : level j에서 더 이상 진입하지 못하는 thread
+* for j = 1 to n - 1  
+  * 초기 조건 : `level[i] = j` 이고 `victim[j] = i`  
+  * 진입 조건 : `∀k != i: (level[k] < j)` 또는 `victim[j] != i`
 * level 0에 thread N개 이하, level j에 thread N - j개 이하, level n - 1에 thread 1개 이하 (CS)
 * Concurrent할 때, 마지막으로 `victim[j]`에 write한 thread는 level j 아래로 내려갈 수 없음
 
 ## The Bakery Lock
+* Fairness 의 측면을 고려하여 FCFS를 도입
 * `flag[i]` : thread i가 진입하고자 함
 * `label[i]` : thread i의 label (작을 수록 먼저)
 * 초기 조건 : `flag[i] = true`, `label[i] = MAX(label[0 : n-1]) + 1`
