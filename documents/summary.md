@@ -1,51 +1,98 @@
 # 2. Mutual Exclusion
 
-## 좋은 Lock algorithm의 조건
+## Thread와 Event
+* Thread는 Event a0, a1, a2, ...의 나열이다.
+* Program order: `thread A: a0, a1, a2, ...`
+* Thread는 State Machine이다.
+  * Thread state = (PC, Local variables)
+  * System state = (Object fields, ∪Thread states)
+* Interval `A = (a, b)`은 두 Event `a, b` 사이의 시간이다.
+* 두 Interval은 concurrent하게 interleaving 할 수 있다.
+* 두 Interval 이 disjoint하면 precedence를 정할 수 있고, 이것은 partial order에 해당함.
+  * Irreflexive: `￢(A⇒A)`
+  * Antisymmetric: `(A⇒B) → ￢(B⇒A)`
+  * Transitive: `(A⇒B)∧(B⇒C) → A⇒A)`
+  * 하지만 겹칠 수 있으므로 `∀A≠B: (A⇒B)∨(B⇒A)`이 성립하지 않는다.
+* Event a<sub>i</sub><sup>k</sup>: Thread i의 k번째 Event a
+* Interval A<sub>i</sub><sup>k</sup>: Thread i의 k번째 Interval A
+
+## Lock algorithm의 특성
 * Mutual Exclusion
   * 서로 다른 스레드의 CS가 서로 겹치지 않는다.
+  * 따라서 서로 다른 스레드의 CS 사이에는 반드시 순서가 있다.
+  * `∀i,j∀p,q: (CSip⇒CSjq)∨(CSjq⇒CSip)`
 * Deadlock-free
   * Lock을 얻으려하는 적어도 하나의 스레드는 언젠가 Lock을 얻게 된다.
 * Starvation-free (= _lockout freedom_)
   * Lock을 얻으려하는 모든 스레드는 언젠가 Lock을 얻게 된다.
-  * Starvation-free이면 Deadlock-free이다.
+  * Starvation-free ⊆ Deadlock-free이다.
 * Fairness
-  * Overtake 횟수가 제한된다.
+  * Stall하고 있는 스레드에 대한 Overtake 횟수가 제한된다.
 
 ## The Peterson Lock
+* 두 스레드 i, j만 있는 경우
 * `flag[i]` : thread i가 진입하고자 함
 * `victim` : victim에 해당하는 thread는 진입할 수 없음
 * 초기 조건 : `flag[i] = true` 이고 `victim = i`
 * 진입 조건 : `flag[j] == faise` 또는 `victim == j`
-* Concurrent하지 않을 때 : `flag[j] == false`이므로 진입
-* Concurrent할 때: `victim`이 하나의 값만 가지므로, thread i와 j 중 하나만 진입
+* Sequential할 때 : `flag[j] == false`이므로 진입
+* Concurrent할 때 : `victim`이 하나의 값만 가지므로, thread i와 j 중 하나가 진입
 
 ## The Filter Lock
+* n개의 스레드가 있는 경우
 * `level[i]` : thread i가 진입하고자 하는 level
-* `victim[j]` : level j에서 더 이상 진입하지 못하는 thread
-* for j = 1 to n - 1  
-  * 초기 조건 : `level[i] = j` 이고 `victim[j] = i`  
-  * 진입 조건 : `∀k != i: (level[k] < j)` 또는 `victim[j] != i`
-* level 0에 thread N개 이하, level j에 thread N - j개 이하, level n - 1에 thread 1개 이하 (CS)
-* Concurrent할 때, 마지막으로 `victim[j]`에 write한 thread는 level j 아래로 내려갈 수 없음
+* `victim[L]` : level L에서 더 이상 진입하지 못하는 thread
+* `for L = 1 to n-1`
+  * 초기 조건 : `level[i] = L` 이고 `victim[L] = i`  
+  * 진입 조건 : `∀k != i: (level[k] < L)` 또는 `victim[L] != i`
+* **level i랑 `level[i]`의 용법이 다르므로 주의! 전자는 i번째 level을 의미하고 후자는 위에 쓰인 대로다.**
+* level 0은 CS를 빠져나온 것이고, level n은 CS에 들어간 것이다.
+* level L(0<L<n)에는 thread n-L개 이하만 진입할 수 있다.
+* 
+
+### Filter Lock 작동 시나리오
+* 가장 쉬운 예로 n개 스레드가 달려들면 level 1 ~ level n-1까지 총 n-1개 스레드는 하나씩 victim이 되어 대기하고, 1개 스레드만 level n에 있게 된다. 각 level의 victim에 마지막으로 write한 스레드는 level L 다음으로 진행할 수 없다.
+* 만약 m(<n)개 스레드가 달려들면 level 1 ~ level m-1까지 총 m-1개 스레드는 위에서부터 하나씩 victim이 되어 대기하고, thread i는 level m에서 `level[i] = m`, `victim[m] = i`을 수행한 후, `∀k != i: (level[k] < m)` 진입 조건을 만족해서 (왜냐하면 `k != i: level[k] ≥ m`이려면 코드를 수행해야 하므로 level m에 thread k가 도달했어야 함) 아래로 쭉쭉 내려가 level n에 도달한다. `level[i] == n`이므로 다른 스레드들은 모두 대기해야 한다. thread i가 CS를 빠져나가 `level[i] = 0`을 수행하면 level m-1에서의 victim이 내려올 수 있게 된다.
+
+### Filter Lock 추월 시나리오
+* 마지막으로 `victim[L]`에 write한 thread는 level L 아래로
+ 진행할 수 없지만, 누군가 `victim[L]`에 write만 해주면 반드시 내려갈 수 있다.
+* level L에 thread 1이 진입한 후, `∀k != i: (level[k] < L)` 진입 조건으로 넘어가려다가 잠시 멈추었다고 하자. 이때 thread 2가 들어오면 `level[1] == L`이고 `victim[L] == 2`이므로 대기하지만, thread 3이 들어오면 `victim[L] == 3`이 되므로 thread 2가 level L을 지나 진행할 수 있게 된다. thread 2가 한 바퀴 돌아 다시 level L로 돌아와 `victim[L] = 2`를 수행하면, 그때까지 대기하고 있던 thread 3이 `victim[L] == 2`이므로 진행할 수 있게 된다. (thread 2가 CS를 빠져나가 `level[2] == 0`가 되더라도 `level[1] == L`이 버티고 있으므로 어차피 만족 불가여서 `victim[L]`만 보면 됨) 이렇게 thread 2와 thread 3이 서로를 victim으로 하여 무한히 thread 1을 추월하는 일이 이론적으로 가능하므로, filter lock은 fair하지 않은 lock algorithm이다.
+
+## Bounded Waiting
+* `lock()`을 **Doorway interval**(finite step)과 **Waiting interval**(unbounded step)로 나누어보자.
+* `for thread A, B` (Bounded waiting)
+  * if D<sub>A</sub><sup>k</sup>⇒D<sub>B</sub><sup>j</sup>
+  * then CS<sub>A</sub><sup>k</sup>⇒CS<sub>B</sub><sup>j</sup>
+  * B가 A를 추월 할 수 없다.
+* `for thread A, B` (r-Bounded waiting)
+  * if D<sub>A</sub><sup>k</sup>⇒D<sub>B</sub><sup>j</sup>
+  * then CS<sub>A</sub><sup>k</sup>⇒CS<sub>B</sub><sup>j+r</sup>
+  * B가 A을 r회를 넘어서 추월할 수 없다. (추월 가능한 경우: j, j+1, ..., j+r-1로 총 r회)
+
 
 ## The Bakery Lock
 * Fairness 의 측면을 고려하여 FCFS를 도입
 * `flag[i]` : thread i가 진입하고자 함
-* `label[i]` : thread i의 label (작을 수록 먼저)
-* 초기 조건 : `flag[i] = true`, `label[i] = MAX(label[0 : n-1]) + 1`
-* 진입 조건 : `for all k != i (flag[k] == false || (label[k], k]) >> (lable[i], i))`
-* `(label[i], i)`를 비교하면 label이 겹치더라도 어느 thread가 진입할 것인지 알 수 있음
+* `label[i]` : thread i의 label (작을수록 우선순위가 높음)
+* 초기 조건 : `flag[i] = true`, `label[i] = MAX(label[0:n-1]) + 1`
+* 진입 조건 : `∀k != i (flag[k] == false)` (다른 스레드가 기다리지 않음) 또는 `∀k != i:
+ {(label[k], k]) > (label[i], i)}` (i의 우선순위가 가장 높음) - `(label[n], n)`은 label을 먼저 비교하고 그 다음 스레드 번호를 비교해서 tie-breaking한다.
 * Overflow의 위험성이 있다.
 
 ## Bounded Timestamps
 * T<sup>2</sup> : 0 < 1 < 2 < 0
 * T<sup>k</sup> = T<sup>2</sup> * T<sup>k-1</sup>
-  * T<sup>n</sup>는 n-1개의 digit이 있고, n-thread bounded sequential timestamping system의 basis
   * T<sup>3</sup> : (00 < 01 < 02 < 00) < (10 < 11 < 12 < 10) < (20 < 21 < 22 < 00) < (00 < 01 < 02 < 00)
+  * T<sup>n</sup>는 n-1개의 digit이 있고, n-thread bounded sequential timestamp system의 basis임.
+  * T<sup>k</sup>에는 k개의 thread가 배당되는데, 이를 살펴보면 T<sup>2</sup>에서 1개의 스레드와 k-1개의 스레드가 나뉘고, k-1개의 thread가 T<sup>k-1</sup>에 재귀적으로 배당됨.
+  * Sequential하게 Timestamp를 할당하는 경우라면 항상 overflow 없이 timestamp를 완벽하게 할 수 있음.
+  * Concurrent하게 Timestamp를 할당하는 경우라면 문제가 생길 수 있음. 예를 들어 T<sup>3</sup>의 경우, Concurrent하게 instruction을 수행하다가 <0x 1y 2z>로 배치되거나 <x0 x1 x2>로 배치되는 경우가 있을 수 있다.
 
 ## Lower Bounds on the Number of Locations
-* thread가 n개일 때, Deadlock-free Lock algorithm은 최악의 경우 최소 n개의 서로 다른 메모리를 할당하고 접근해야함
-* 따라서 기본적인 load & store instruction  대신 synchronization operation이 필요함
+* thread가 n개일 때, Deadlock-free Lock algorithm은 최악의 경우 최소 n개의 서로 다른 공유메모리(MRSW Boolean Register)를 할당하고 접근해야한다.
+* 알려져 있는 것으로 2n개의 공유메모리를 쓰는 Bakery Lock이 있으므로, 최소해 x: n ≤ x ≤ 2n이다.
+* 따라서 기본적인 load & store instruction  대신 synchronization operation이 필요하다.
 
 # 3. Concurrent Object
 
@@ -55,7 +102,7 @@
 * 어떤 object에 pending된 method call이 하나도 없을 때, 그때까지의 실행 결과와 결과가 동등한 어떤 sequential execution order가 존재
 * object가 quiescent한 구간 전후로 method 수행 순서가 보장됨
 * 수행 순서가 무관한 concurrent execution에서 유용
-* Quiescent Consistency는 _nonblocking_ correctness condition이며 compositinal함
+* Quiescent Consistency는 _non-blocking_ correctness condition이며 compositinal함
 * 용어 정리
   * total method
     * 모든 object state에 대해 정의되는 method (ex. `enq()` if unbounded)
