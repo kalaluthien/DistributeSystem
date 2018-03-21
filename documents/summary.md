@@ -52,7 +52,7 @@
 
 ### Filter Lock 작동 시나리오
 * 가장 쉬운 예로 level 0에서부터 n개 스레드가 달려들면 level 1 ~ level n-1까지 총 n-1개 스레드는 하나씩 victim이 되어 level에 진입하지 못하고 대기하고, 1개 스레드만 level n-1에 진입한다.
-* 만약 m (< n)개 스레드가 달려들면 level 1 ~ level m-1까지 총 m-1개 스레드는 위에서부터 하나씩 victim이 되어 대기하고, thread i는 level m-1에서 `level[i] = m-1`, `victim[m-1] = i`을 수행한 후, `∀k != i: (level[k] < m-1)` 진입 조건을 만족해서 (왜냐하면 `k != i: level[k] ≥ m-1`이려면 코드를 수행해야 하므로 level m-1에 thread k가 도달했어야 함) 아래로 쭉쭉 내려가 level n-1에 도달한다. for문을 빠져나가면 `level[i] == n`이 되므로 다른 스레드들은 모두 대기해야 한다. thread i가 CS를 빠져나가 `level[i] = 0`을 수행하면 level m-1에서의 victim이 level m-1에 진입할 수 있게 되고, 아래로 쭉쭉 내려갈 수 있게 된다.
+* 만약 m (< n)개 스레드가 달려들면 level 1 ~ level m-1까지 총 m-1개 스레드는 위에서부터 하나씩 victim이 되어 대기하고, thread i는 level m-1에서 `level[i] = m-1`, `victim[m-1] = i`을 수행한 후, `∀k != i: (level[k] < m-1)` 진입 조건을 만족해서 (_왜냐하면 `k != i: level[k] ≥ m-1`이려면 코드를 수행해야 하므로 level m-1에 thread k가 도달했어야 함_) 아래로 쭉쭉 내려가 level n-1에 도달한다. for문을 빠져나가면 `level[i] == n-1`이 되므로 다른 스레드들은 모두 대기해야 한다. thread i가 CS를 빠져나가 `level[i] = 0`을 수행하면 level m-1에서의 victim이 level m-1에 진입할 수 있게 되고, 아래로 쭉쭉 내려갈 수 있게 된다.
 
 ### Filter Lock 추월 시나리오
 * 마지막으로 `victim[L]`에 write한 thread는 level L에 진입할 수 없지만, 누군가 `victim[L]`에 write만 해주면 반드시 들어갈 수 있다.
@@ -75,7 +75,8 @@
 * `label[i]` : thread i의 label (작을수록 우선순위가 높음)
 * 초기 조건 : `flag[i] = true`, `label[i] = MAX(label[0:n-1]) + 1`
 * 진입 조건 : `∀k != i: (flag[k] == false) || (label[k], k]) > (label[i], i)` (진입하고자 하는 스레드 중에서 i의 우선순위가 가장 높음)
-* `(label[n], n)`은 label을 먼저 비교하고 그 다음 스레드 번호를 비교해서 tie-breaking한다. Overflow의 위험성이 있다.
+* `(label[n], n)`은 label을 먼저 비교하고 그 다음 스레드 번호를 비교해서 tie-breaking한다.
+* `label[n]`에서 Overflow 위험성이 있다.
 
 ## Bounded Timestamps
 * T<sup>2</sup> : 0 < 1 < 2 < 0
@@ -84,7 +85,7 @@
   * T<sup>n</sup>는 n-1개의 digit이 있고, n-thread bounded sequential timestamp system의 basis임.
   * T<sup>k</sup>에는 k개의 thread가 배당되는데, 이를 살펴보면 T<sup>2</sup>에서 1개의 스레드와 k-1개의 스레드가 나뉘고, k-1개의 thread가 T<sup>k-1</sup>에 재귀적으로 배당됨.
 * Sequential하게 Timestamp를 할당하는 경우라면 항상 overflow 없이 timestamp를 완벽하게 할 수 있음.
-* Concurrent하게 Timestamp를 할당하는 경우라면 문제가 생길 수 있음. 예를 들어 T<sup>3</sup>의 경우, Concurrent하게 instruction을 수행하다가 <0x 1y 2z>로 배치되거나 <x0 x1 x2>로 배치되는 경우가 있을 수 있다.
+* Concurrent하게 Timestamp를 할당하는 경우라면 문제가 생길 수 있음. 예를 들어 T<sup>3</sup>의 경우, Concurrent하게 instruction을 수행하다가 {0x, 1y, 2z}로 배치되거나 {x0, x1, x2}로 배치되는 경우가 있을 수 있다.
 * CAS instruction을 사용해야 concurrent하게 timestamp를 배정할 수 있다. _TODO_
 
 ## Lower Bounds on the Number of Locations
@@ -106,17 +107,28 @@
   * Invocation notation) `A q.enq(x)` <- `thread object.method` (이때 method는 명시적)
   * Response notation) `A q: void` <- `thread object:result` (이때 method는 암시적)
   * 이때 result는 return value일 수도 있고, exception일 수도 있다.
-* History = Sequence of invocations and responses
+
+## History
+* History는 Sequence of invocations and responses이다.
   * H = [`A q.enq(3)`, `A q:void`, `A q.enq(5)`, `B p.enq(4)`, `B p:void`, `B q.deq()`, `B q:3`]
+* Projection은 History 중에서 일부만 따로 떼낸 것.
   * H|q (q is object) : Object projections
   * H|A (A is thread) : Thread projections
-  * Complete subhistory : 반영이 되었는지 알 수 없는 pending invocation을 빼버린 것.
-  * Sequential history : method call이 interleave하지 않고 다닥 다닥 붙은 경우. (마지막 pending이나 seq spec 무시는 괜찮음)
-  * Well-formed history : 각 thread 별 history(H|A, H|B, ...)가 sequential한 경우.
-  * Equivalent history : `∀T: H|T = G|T`를 만족시키면 H랑 G는 equivalent하다.
-  * Legal history : 모든 object x에 대하여 H|x가 sequential spec을 만족하는 Sequential history H.
+* Complete subhistory : 반영이 되었는지 알 수 없는 pending invocation을 빼버리는 것.
+* Sequential history : 서로 다른 thread나 object에 대한 method call들이 서로 겹치지 아니하고 다닥 다닥 붙은 경우. (마지막 pending이나 seq spec 무시는 괜찮음) Interleaving/Overlapping이 없음.
+  * H = [`A q.enq(3)`, `A q:void`, `B p.enq(4)`, `B p:void`, `B q.deq()`, `B q:3`, `A q.enq(5)`]
+  * `A q.enq` match, `B p.enq` match, `B q.deq` match, `A q.enq` pending (OK)
+* Well-formed history
+  * thread 별 history(H|A, H|B, ...)가 sequential한 경우. 다시 말해 program order를 지키는 경우. 우리가 이야기하는 History들은 전부 Well-formed여야 한다. Well-formed가 아닌 경우에는 예를 들어 dependence가 없는 instruction의 순서를 바꾸는 경우와 같은 것들이 있다.
+* Equivalent history
+  * `∀T: H|T = G|T`를 만족시키면 H랑 G는 equivalent하다. Interleaving/Overlapping을 어떻게 하건 간에 각각의 thread들의 입장에서 보면 동등하니까.
+* Legal (sequential) history
+  * 모든 object x에 대하여 H|x가 sequential spec을 만족하는 Sequential history H. 다시 말해 Sequential하게 method call들을 배치하는 거야 그냥 막 가져다 붙이면 되지만 그게 아니고 정말로 프로그램을 잘 수행해서 말이 되는 결과가 나오는 history.
+  * `A p.enq(1)`, `A p:void` `A p.enq(2)`, `A p:void`, `B p.deq()`, `B p:1` ⇒ Legal.
+  * `A p.enq(1)`, `A p:void` `A p.enq(2)`, `A p:void`, `B p.deq()`, `B p:2` ⇒ Illegal.
+  * 왜 Sequential을 붙이냐면 어차피 legal한지 판단하는 기준이 sequential이니까... (다시 말해 concurrent가 valid한지를 legal sequential history와의 equivalent로 이야기할 것이기 때문)
 
-## Quiescent Consistency
+## Quiescent Consistency _TODO_
 * **Principle** Method calls should appear to happen in a one-at-a-time, sequential order.
 * **Principle** Method calls separated by a period of quiescence should appear to take effect in their real-time order.
 * 어떤 object에 pending된 method call이 하나도 없을 때, 그때까지의 실행 결과와 결과가 동등한 어떤 sequential execution order가 존재함.
@@ -133,7 +145,7 @@
   * compositinal
     * 시스템 내의 각 object가 P를 만족할 때, 시스템 전체도 P를 만족하면 P는 compositinal한 correctness condition
 
-## Sequential Consistency
+## Sequential Consistency _TODO_
 * **Principle** Method calls should appear to happen in a one-at-a-time, sequential order.
 * **Principle** Method calls should appear to take effect in program order.
 * (1) 각 thread 내에서의 program order를 보존하고 (2) object의 sequential specification을 만족하는 어떤 sequential execution order가 존재함.
@@ -149,7 +161,7 @@
   * ex) \[`A.p.enq(x)`\] \[`B.q.enq(y)`\] \[`A.q.enq(x)`\] \[`B.p.enq(y)`\] \[`A.p.deq(y)`\] \[`B.q.deq(x)`\]
     * p에 대해서는 `true`, q에 대해서도 `true`이지만 전체에 대해서는 `false`
 
-## Linearizability
+## Linearizability _TODO_
 * **Principle** Method calls should appear to happen in a one-at-a-time, sequential order
 * **Principle** Each method call should appear to take effect instantaneously at some moment between its invocation and responce
 * 서로 겹치지 않는 concurrent method call은 그 순서로 실행되고(program order는 저절로 보존), 서로 겹치는 concurrent method call은 object의 sequential specification을 만족하도록 하는 순서로 실행되어, 전체 History가 그와 동등한 어떤 sequential execution order가 있어야 함
@@ -159,7 +171,7 @@
   * Lock 없음: a single step
 * Linearizability는 nonblocking correctness condition이며 compositinal함
 
-## Progress Conditions
+## Progress Conditions _TODO_
 * Blocking
   * 한 thread의 unexpected delay가 다른 thread들이 progress하지 못하게 할 수 있으면 blocking implementation
   * ex) Mutual-exclusion
@@ -183,37 +195,53 @@
 # 4. Foundations of Shared Memory
 
 ## Read-Write Register
-* SRSW - MRSW - MRMW, Boolean - M-valued
-* Safe - Regular - Atomic
+* SRSW ~ MRSW ~ MRMW
+* Boolean ~ M-valued
+  * M-valued는 M개의 값을 나타낸다는 의미이다. (말하자면 Boolean은 0, 1 2개의 값을 나타내므로 2-valued)
+  * M-valued는 log(M)-bit라고도 할 수 있긴 한데, 뒤에서 M-valued를 construct할 때는 M-bit를 써서 One-Hot encoding 한다.
+* Safe ~ Regular ~ Atomic
+  * Safe의 조건
+    * Read와 Write가 Sequential한 경우, 우리 생각되로 되어야 함.
+    * Read와 Write가 Concurrent한 경우, 무엇을 읽던간에 valid한 값(High-impedence 이런 거 안 됨)을 읽어야 한다. 예를 들어 1010에 0111을 쓰고 있는 동안 동시에 읽으면 1010이든 0111이든 0101이든 0000이든 다 상관 없고 0이랑 1로 되어있으면 됨.
+    * real-time order도 상관 없다. Read-Write-Read가 다 겹쳤을 때, 앞에서 update가 된 값을 잘 읽었더라도 뒤에서는 틀려도 된다.
   * Regular의 조건
-    * R<sup>i</sup> -> W<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 미래에 쓰인 값을 읽는 경우)
-    * W<sup>i</sup> -> W<sup>j</sup> -> R<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 과거에 덮어쓰인 값을 읽는 경우)
+    * Safe에서 아무 valid → Old | New (역시 real-time order는 고려하지 않음)
+    * R<sup>i</sup> → W<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 미래에 쓰인 값을 읽는 경우)
+    * W<sup>i</sup> → W<sup>j</sup> → R<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 과거에 덮어쓰인 값을 읽는 경우)
   * Atomic의 조건
-    * 위의 조건과 더불어, R<sup>i</sup> -> R<sup>j</sup>일 때 i > j 인 경우는 존재하지 않음
+    * 위의 조건과 더불어, R<sup>i</sup> -> R<sup>j</sup>일 때 i > j 인 경우는 존재하지 않음 (real-time order를 고려함)
+    * 따라서 Atomic해지면 Read Write로 이루어진 history가 linearizable해진다.
 * Weakest Register : SRSW Safe Boolean
   * 여기서부터 모든 다른 register(MRMW Atomic M-valued, Atomic Snapshot, etc)를 구성할 수 있음
   * 하지만 Consensus hierarchy를 뛰어넘을 수는 없음 (concensus number = 1)
-* SRSW Safe -> MRSW Safe
-  * 각 reader마다 SRSW를 하나씩 할당하면 MRSW가 됨
+* SRSW Safe Boolean -> MRSW Safe Boolean
+  * M개의 reader가 있을 때, 각 reader마다 SRSW를 하나씩 할당하면 MRSW가 된다. writer는 각 register마다 write를 하고, reader는 자신의 register를 읽는다.
+  * MRSW Safe Boolean = N * SRSW Safe Boolean
 * MRSW Safe Boolean -> MRSW Regular Boolean
-  * 할당되어 있는 값과 바꿀 값이 동일하면 write하지 않음
+  * 할당되어 있는 값과 바꿀 값이 동일하면 write하지 않는다.
+  * 그러려면 writer가 local variable로 `old_value`를 들고 있으면 된다. 어차피 이거는 shared memory가 아니니까 아무 거나 상관 없다.
 * MRSW Regular Boolean -> MRSW Regular M-valued
-  * MRSW를 M개 두고 `read()` 수행시 reader는 0 to M-1, `write(x)` 수행시 writer는 x to 0로 scan함
+  * One-Hot encoding을 한다.
+  * MRSW를 M개 두고 `read()` 수행시 reader는 0 to M-1, `write(x)` 수행시 writer는 x to 0로 scan.
+  * reader는 old를 읽거나 new를 읽게 되므로 Regular하다.
+  * MRSW Regular M-valued = M * MRSW Regular Boolean
 * MRSW Regular -> SRSW Atomic
-  * writer는 `value:stamp`를 write, reader는 마지막으로 읽은 `value:stamp`를 저장하여 stamp가 최신인 것을 read
+  * writer는 `value:stamp`를 write하고, reader는 마지막으로 읽은 `value:stamp`를 local memory에 saved로 저장하여 `saved(value:stamp)`와 `read(value:stamp)` 중에서 stamp가 최신인 것을 read한다. 그리고 마지막으로 읽은 값을 saved에 update한다.
+  * SRSW Atomic = MRSW Regular M-valued + timestamp + reader's copy
 * SRSW Atomic -> MRSW Atomic
-  * SRSW를 (thread 수)<sup>2</sup>만큼 할당 (thread[0] = writer, thread[1:n] = reader) 구현에 따라서는 (reader 수)<sup>2</sup>면 충분
-  * **writer**: column 0에 순서대로 write (또는, 대각선으로 write)
-  * **reader**: row i의 최신값을 읽고, column i에 순서대로 write
-  * 이렇게 하면 다른 reader가 읽은 값을 놓치는 경우는 (read 시간 역전?) 두 read가 겹쳤을 때 뿐이므로 문제가 없음
+  * SRSW를 (thread 수)<sup>2</sup>만큼 할당한다. (thread[1] = writer, thread[2:N] = reader)
+  * **writer**: column 1에 순서대로 write한다. 또는, 대각선으로 (1,1), (2,2), ..., (N, N)의 위치에다 write해도 된다.
+  * **reader**: thread i는 row i의 최신값을 read하여 그 값을 column i에 순서대로 write한 후에 return한다.
+  * 이렇게 하면 다른 reader가 읽은 값을 놓치는 경우는 두 read가 겹쳤을 때 뿐이므로 이럴 때는 문제가 없다.
+  * MRSW Atomic = N<sup>2</sup> * SRSW Atomic
 * MRSW Atomic -> MRMW Atomic
-  * Bakery algorithm과 거의 동일함
-  * MRSW를 writer 수만큼 할당
-  * **writer**: array를 다 읽고 timestamp를 뽑아서 자기 자리에 write
-  * **reader**: array를 다 읽고 timestamp가 최신인 것을 read
-  * timestamp 받는 부분이 write order의 linearization point, max stamp 읽는 부분이 read order의 linearization point
-    * 특정 code line이 linearization point가 아니고 실행에 따라 다름
-* Atomic Snapshot
+  * Bakery algorithm과 거의 동일하게, MRSW를 writer 수만큼 할당한다. (`label[n]`처럼)
+  * **writer**: array를 다 읽고 최신의 timestamp를 뽑아서 자기 자리에 write한다.
+  * **reader**: array를 다 읽고 timestamp가 최신인 것을 read한다.
+  * max(timestamp) 받는 부분이 write order의 linearization point, max(timestamp) 읽는 부분이 read order의 linearization point이다.
+    * 특정 code line이 linearization point가 아니고 실행에 따라 다르다는 것에 주의한다.
+  * MRMW Atomic = N * MRSW Atomic
+* Atomic Snapshot _TODO_
   * **update**(한 array element에 write) & **scan**(모든 array element를 read)
   * _clean double collect_: linearizable하지 않음 & **scan**이 wait-free가 아니어서 starvation을 겪을 수 있음
   * wait-free snapshot: **update**에서도 **scan**을 함
@@ -224,16 +252,17 @@
 * object가 consensus 문제를 해결할 수 있는 최대 thread 수
 * consensus number < N인 object를 이용해서 consensus number = N인 wait-free(or lock-free)한 object를 만들 수 없음
   * No wait-free implementation of N-thread consensus from read-write atomic registers
-  * -> Asynchronous computability different from Turing computability
+  * -> Asynchronous computability is different from Turing computability
 * concurrent consensus object
   * `object.decide(input)`의 output은 다음 조건을 만족함
   * _consistent_ : 모든 thread가 같은 값을 decide
   * _valid_ : decide된 값은 어떤 thread의 input
   * `decide()`에 의해 처음으로 선택된 thread를 기준으로 해서 sequential consensus object으로 linearizable
 * consensus number 비교
-  * Atomic read-write register는 1
-  * Multi-dequeuer FIFO queue는 n 이상 (맨 처음 `deq()`한 thread의 값으로 decide)
-  * (n, n(n+1)/2)-Assignment Object는 n 이상 (총 n(n+1)/2 register에 n개를 동시에 write해서 덮어쓰인 쪽이 우선)
+  * Atomic register는 1
+  * Multi-dequeuer FIFO-queue는 n 이상 (맨 처음 `deq()`한 thread의 값으로 decide)
+  * (n, n(n+1)/2)-Assignment Object는 n 이상
+    * (총 n(n+1)/2 register에 n개를 동시에 write해서 덮어쓰인 쪽이 우선)
   * X로 Y를 구현했다면, n(X) ≥ n(Y)
 
 ## Consensus protocol
@@ -248,7 +277,7 @@
     * A는 r0에, B는 r1에 write할 때 (A와 B가 다른데 썼는데 순서에 따라 결과가 달라짐)
     * A와 B가 모두 r에 write할 때 (B는 무조건 쓴다고 하면 덮어썼는데 결과가 달라짐)
 
-## Read-Modify-Write Operation
+## Read-Modify-Write (RMW) Operation
 * register의 기존 값 x를 f(x)로 바꾸고 x(기존 값)를 반환하는 operation
 * `get()` : f(x) = x
 * `get-and-set(v)` : f(x) = v
