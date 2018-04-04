@@ -107,6 +107,12 @@
   * Invocation notation) `A q.enq(x)` <- `thread object.method` (이때 method는 명시적)
   * Response notation) `A q: void` <- `thread object:result` (이때 method는 암시적)
   * 이때 result는 return value일 수도 있고, exception일 수도 있다.
+  * Total method
+    * 모든 object state에 대해 정의되는 method. (ex. `q.enq()` if `q` is unbounded)
+  * Partial method
+    * 어떤 object state에 대해 정의되지 않는 method. (ex. `q.deq()` because of EMPTY\_QUEUE\_EXCEPTION)
+  * Nonblocking
+    * total method에 대한 임의의 pending call은 언제나 완료될 수 있다는 의미.
 
 ## History
 * History는 Sequence of invocations and responses이다.
@@ -119,78 +125,109 @@
   * H = [`A q.enq(3)`, `A q:void`, `B p.enq(4)`, `B p:void`, `B q.deq()`, `B q:3`, `A q.enq(5)`]
   * `A q.enq` match, `B p.enq` match, `B q.deq` match, `A q.enq` pending (OK)
 * Well-formed history
-  * thread 별 history(H|A, H|B, ...)가 sequential한 경우. 다시 말해 program order를 지키는 경우. 우리가 이야기하는 History들은 전부 Well-formed여야 한다. Well-formed가 아닌 경우에는 예를 들어 dependence가 없는 instruction의 순서를 바꾸는 경우와 같은 것들이 있다.
-* Equivalent history
-  * `∀T: H|T = G|T`를 만족시키면 H랑 G는 equivalent하다. Interleaving/Overlapping을 어떻게 하건 간에 각각의 thread들의 입장에서 보면 동등하니까.
+  * thread 별 history(H|A, H|B, ...)가 sequential한 경우. 우리가 이야기하는 History들은 전부 Well-formed여야 한다. Well-formed가 아닌 history는 method가 끝나기 전에 다른 method가 끝난다거나, method가 불리기 전에 반환부터 한다거나 하는 뒤틀린 황천의 history이다.
+* Equivalent history (history의 동등성)
+  * `∀T: H|T = G|T`를 만족시키면 H랑 G는 동등하다. Interleaving/Overlapping을 어떻게 하건 간에 각각의 thread들의 입장에서 보면 동등하니까. 결과는 history의 entry들이 같다는 것만 확인해도 되는데 어차피 history에 input과 output이 다 들어있으니까.
 * Legal (sequential) history
   * 모든 object x에 대하여 H|x가 sequential spec을 만족하는 Sequential history H. 다시 말해 Sequential하게 method call들을 배치하는 거야 그냥 막 가져다 붙이면 되지만 그게 아니고 정말로 프로그램을 잘 수행해서 말이 되는 결과가 나오는 history.
-  * `A p.enq(1)`, `A p:void` `A p.enq(2)`, `A p:void`, `B p.deq()`, `B p:1` ⇒ Legal.
-  * `A p.enq(1)`, `A p:void` `A p.enq(2)`, `A p:void`, `B p.deq()`, `B p:2` ⇒ Illegal.
+  * Legal history ⇒
+    * `A p.enq(1)`
+    * `A p:void`
+    * `A p.enq(2)`
+    * `A p:void`
+    * `B p.deq()`
+    * `B p:1`
+  * Illegal history ⇒
+    * `A p.enq(1)`
+    * `A p:void`
+    * `A p.enq(2)`
+    * `A p:void`
+    * `B p.deq()`
+    * `B p:2`
   * 왜 Sequential을 붙이냐면 어차피 legal한지 판단하는 기준이 sequential이니까... (다시 말해 concurrent가 valid한지를 legal sequential history와의 equivalent로 이야기할 것이기 때문)
+* History가 동등(Equivalent)한 것은 thread에 대해 검사하고, history가 부합(Legal)하는 것은 object에 대해 검사한다.
 
-## Quiescent Consistency _TODO_
+## Quiescent Consistency (QC)
 * **Principle** Method calls should appear to happen in a one-at-a-time, sequential order.
 * **Principle** Method calls separated by a period of quiescence should appear to take effect in their real-time order.
-* 어떤 object에 pending된 method call이 하나도 없을 때, 그때까지의 실행 결과와 결과가 동등한 어떤 sequential execution order가 존재함.
-* object가 quiescent한 구간 전후로 method 수행 순서가 보장됨.
-* 수행 순서가 무관한 concurrent execution에서 유용하다.
-* Quiescent Consistency는 _non-blocking_ correctness condition이며 compositinal함.
-* 용어 정리
-  * total method
-    * 모든 object state에 대해 정의되는 method (ex. `enq()` if unbounded)
-  * partial method
-    * 어떤 object state에 대해 정의되지 않는 method (ex. `deq()` because of EMPTY\_QUEUE\_EXCEPTION)
-  * nonblocking
-    * total method에 대한 임의의 pending call은 언제나 완료될 수 있음
-  * compositinal
-    * 시스템 내의 각 object가 P를 만족할 때, 시스템 전체도 P를 만족하면 P는 compositinal한 correctness condition
+* 어떤 object x에 pending된(inv-res 쌍을 이루지 못한) method call이 하나도 없을 때, 그때까지의 history와 동등한 어떤 sequential execution order (history)가 존재한다. 즉, 모든 x에 대하여 H|x와 동등한 S|x가 존재한다.
+* object가 quiescent한 구간(경계) 전후로 method 수행 순서가 보장된다. quiescent하지 않은 동안의 method 수행 순서는 program order조차 보장되지 않는다.
+* 수행 순서가 무관한 concurrent execution에서 유용하다. (OOO)
+* Quiescent Consistency는 _nonblocking_ correctness condition이며 compositinal하다.
+  * nonblocking: total method에 대한 임의의 pending call은 언제나 완료될 수 있다는 의미이다.
+  * compositinal: 시스템 내의 각 object가 P를 만족할 때, 시스템 전체도 P를 만족하면 P는 compositinal한 correctness condition이라고 한다. Consistency에 대해 적용해보면 대충 `∀x:P(H|x) ⇒ P(H)`인 P라고 하면 될 것 같다. 다시 말해, 각 object들이 QC를 만족시키면 전체 history (system)도 QC를 만족시킨다.
 
-## Sequential Consistency _TODO_
+## Sequential Consistency (SC)
 * **Principle** Method calls should appear to happen in a one-at-a-time, sequential order.
 * **Principle** Method calls should appear to take effect in program order.
-* (1) 각 thread 내에서의 program order를 보존하고 (2) object의 sequential specification을 만족하는 어떤 sequential execution order가 존재함.
-* Quiescent Consistency와 Sequential Consistency는 incomparable (포함 관계 x)
-  * Quiescent Consistency는 quiescent한 구간 전후로만 수행 순서가 보장되므로 program order를 보존하지 않음
-  * ex) \[`A.enq(x)` call\] \[`B.enq(y)` call\] \[`A.enq(x)` return\] \[`A.enq(z)` call\] \[`B.enq(y)` return\] \[`A.enq(z)` return\] \[`A.deq(z)`\]
-    * sequential consistent = `false`, quiescent consistent = `true`
-  * Sequential Consistency는 real-time order와 무관하므로 object가 quiescent한 구간 전후로 서로 다른 thread의 method 수행 순서가 보장되지 않음
-  * ex) \[`A.enq(x)`\] \[`B.enq(y)` call\] \[`A.deq(y)` call\] \[`B.enq(y)` return\] \[`A.deq(y)` return\]
-    * sequential consistent = `true`, quiescent consistent = `false`
-* 현대(?)의 멀티프로세서에서 read & write는 sequential consistency하지 않음.
-* Sequential Consistency는 nonblocking correctness condition이며 compositinal하지 않음
-  * ex) \[`A.p.enq(x)`\] \[`B.q.enq(y)`\] \[`A.q.enq(x)`\] \[`B.p.enq(y)`\] \[`A.p.deq(y)`\] \[`B.q.deq(x)`\]
-    * p에 대해서는 `true`, q에 대해서도 `true`이지만 전체에 대해서는 `false`
+* 원본 history H의 pending method call을 적당히 완료시킨 extended history G가 있어서, G에서의 partial order는 딱히 신경쓰지 않는데 G와 동등한 legal sequential history S가 존재한다. (G는 H의 Complete Subhistory) 그러면 서로 다른 thread 사이의 method call은 order를 보장받지 않는다. Program order는 보장하니 같은 thread 사이의 method call은 order를 보장받는다. 즉, method call이 한 thread 내에서 순서를 바꾸지만 않는다면 다른 thread의 method call과의 order를 자유롭게 옮길 수 있다.
+* 여기에 overlap되지 않은 경우의 order까지 보장하게 하면 Linearizable execution이 된다.
+* Quiescent Consistency와 Sequential Consistency는 incomparable하다. (포함 관계 x)
+  * Quiescent Consistency는 quiescent한 구간 전후로만 수행 순서가 보장되므로 program order를 보존할 필요가 없다. 여기서는 `A p.enq(x)`보다 `A p.enq(z)`가 먼저 실행되고 말았다.
+  * ex) SC = `false`, QC = `true`
+    * `A p.enq(x)`
+    * `B p.enq(y)`
+    * `A p:void`
+    * `A p.enq(z)`
+    * `B p:void`
+    * `A p:void`
+    * `A p.deq()`
+    * `A p:z`
+  * Sequential Consistency는 real-time order와 무관하므로 object가 quiescent한 구간 전후로 서로 다른 thread의 method 수행 순서가 보장되지 않는다. 여기서는 `A p.enq(x)`보다 `B p.enq(y)`가 먼저 실행되고 말았다.
+  * ex) SC = `true`, QC = `false`
+    * `A p.enq(x)`
+    * `A p:void`
+    * `B p.enq(y)`
+    * `A p.deq()`
+    * `B p:void`
+    * `A p:y`
+* 현대(?)의 멀티프로세서에서 read & write는 sequential consistency하지 않음. (_cf. relaxed consistency_)
+* Sequential Consistency는 _nonblocking_ correctness condition이며 compositinal하지 않다. 각 object에 대해 SC가 성립하더라도, 전체 execution은 SC가 성립하지 않을 수 있다.
+  * ex) p에 대해서는 `true`, q에 대해서도 `true`이지만 전체에 대해서는 `false`
+    * `A p.enq(x)`
+    * `A p:void`
+    * `B q.enq(y)`
+    * `B q:void`
+    * `A q.enq(x)`
+    * `A q:void`
+    * `B p.enq(y)`
+    * `B p:void`
+    * `A p.deq()`
+    * `A p:y`
+    * `B q.deq()`
+    * `B q:x`
 
-## Linearizability _TODO_
-* **Principle** Method calls should appear to happen in a one-at-a-time, sequential order
-* **Principle** Each method call should appear to take effect instantaneously at some moment between its invocation and responce
-* 서로 겹치지 않는 concurrent method call은 그 순서로 실행되고(program order는 저절로 보존), 서로 겹치는 concurrent method call은 object의 sequential specification을 만족하도록 하는 순서로 실행되어, 전체 History가 그와 동등한 어떤 sequential execution order가 있어야 함
-* 모든 liniearizable execution은 sequentially consistent함 (역은 성립하지 않음) -> side effect moment를 기준으로 sequential order를 매기면 됨
-* method가 side effect를 내는 linearization point를 찾아야 함 (object의 state가 바뀌는 순간)
+## Linearizability
+* **Principle** Method calls should appear to happen in a one-at-a-time, sequential order.
+* **Principle** Each method call should appear to take effect instantaneously at some moment between its invocation and responce.
+* 원본 history H의 pending method call을 적당히 완료시킨 extended history G가 있어서, G에서의 partial order를 모두 포함하면서 G와 동등한 legal sequential history S가 존재한다. (G는 H의 Complete Subhistory) 그러면 S가 G에서의 (서로 다른 thread에서의) partial order를 포함하므로 real-time order를 보존하게 된다. S는 sequential이니까 order가 더 많으며, 그것들은 G에서 overlap된 method call들에 legal하도록 순서를 부여한 것이다. Program order는 당연히 보존한다.
+* 모든 liniearizable execution은 sequentially consistent하다. (역은 성립하지 않음) -> side effect moment를 기준으로 sequential order를 매기면 된다. 그 moment가 instant하다는 가정이다.
+* method가 side effect를 내는 linearization point를 찾아야 한다. (object의 state가 바뀌는 한 순간)
+  * 항상 같은 line은 아닐 수도 있다.
   * Lock 있음: critical section
   * Lock 없음: a single step
-* Linearizability는 nonblocking correctness condition이며 compositinal함
+  * 보통은 method가 여러 군데 건드릴테니 그런 건 없다.
+* Linearizability는 _nonblocking_ correctness condition이며 compositinal하다.
 
-## Progress Conditions _TODO_
+## Progress Conditions
 * Blocking
-  * 한 thread의 unexpected delay가 다른 thread들이 progress하지 못하게 할 수 있으면 blocking implementation
+  * 한 thread의 unexpected delay가 다른 thread들이 progress하지 못하게 할 수 있으면 blocking implementation이다.
   * ex) Mutual-exclusion
 * Wait-free
-  * 모든 method call이 유한한 step 후에 종료되는것이 보장되는 경우
-  * thread의 수와 무관한 wait-free method를 population-oblivious라고 함
-  * 모든 method가 wait-free인 object를 wait-free, 모든 instance가 wait-free인 class를 wait-free라고 함
+  * (무한한 실행 동안) 모든 method call이 유한한 step 후에 종료되는것이 보장되는 경우를 말한다.
+  * 모든 method가 wait-free인 object를 wait-free, 모든 instance가 wait-free인 class를 wait-free라고 한다. (참고)
 * Bounded wait-free
-  * method call의 step에 pre-determined bound가 있는 경우
-  * Bounded wait-free -> (unbounded) Wait-free이므로 bounded wait-free가 더 강력한 조건
-  * bound가 thread의 수에 의존하는 경우도 있음
+  * method call의 step에 pre-determined bound가 있는 경우를 말한다.
+  * Bounded wait-free -> (unbounded) Wait-free이므로 bounded wait-free가 더 강력한 조건임을 알 수 있다.
+  * bound가 thread의 수에 의존하는 경우도 있는데 이것도 bounded이다. 어쨋거나 무한하지 않으니까.
 * Lock-free
-  * 어떤 method call이 유한한 step 후에 종료되는 것이 항상 보장되는 경우
-  * Wait-free -> Lock-free 이므로 wait-free가 더 강력한 조건
-  * 만약 실행이 유한하다면 wait-free = lock-free (항상 어떤 method call이 유한한 step 후에 종료해야 하므로)
-  * 일부 thread는 starvation을 겪을 수 있으나, 실제로는 거의 일어나지 않는다면 wait-free보다 실용적일 수 있음
+  * (무한한 실행 동안) 어떤 method call이 유한한 step 후에 종료되는 것이 항상 보장되는 경우를 말한다.
+  * Wait-free -> Lock-free 이므로 Wait-free가 더 강력한 조건임을 알 수 있다.
+  * 만약 실행이 유한하다면 Wait-free = Lock-free (항상 어떤 method call이 유한한 step 후에 종료해야 하므로)
+  * 일부 thread는 starvation을 겪을 수 있으나, 실제로는 거의 일어나지 않는다면 wait-free보다 실용적일 수 있다.
 * Lock-free : Wait-free = Deadlock-free : Starvation-free
-  * Lock-free & Deadlock-free는 전체 thread group의 progress를 보장
-  * Wait-free & Starvation-free는 개별 thread의 process을 보장
+  * Lock-free & Deadlock-free는 전체 thread group의 progress를 보장한다.
+  * Wait-free & Starvation-free는 개별 thread의 process을 보장한다.
 
 # 4. Foundations of Shared Memory
 
@@ -241,63 +278,73 @@
   * max(timestamp) 받는 부분이 write order의 linearization point, max(timestamp) 읽는 부분이 read order의 linearization point이다.
     * 특정 code line이 linearization point가 아니고 실행에 따라 다르다는 것에 주의한다.
   * MRMW Atomic = N * MRSW Atomic
-* Atomic Snapshot _TODO_
-  * **update**(한 array element에 write) & **scan**(모든 array element를 read)
-  * _clean double collect_: linearizable하지 않음 & **scan**이 wait-free가 아니어서 starvation을 겪을 수 있음
-  * wait-free snapshot: **update**에서도 **scan**을 함
+* Atomic Snapshot
+  * **update()**(한 array element에 write) & **scan()**(모든 array element를 read)
+  * 쉽게 말해 multiple read를 동시에 한다. multiple assignment는 consensus랑 연관되어 불가능하다.
+  * 해결책: clean double collect
+    * read하는 thread는 **scan()**을 2번 해서 그 두 값이 동일하면 그것을 snapshot이라 하고, 같지 않으면 재시도한다.
+    * 문제점은 **scan()**이 wait-free가 아니어서 starvation을 겪을 수 있다. 계속 누군가 **update()**를 하고 있으면 clean double collect에 계속해서 실패할 수 있다.
+  * 해결책: wait-free snapshot _TODO_
+    * **update()**에서도 **scan()**을 한다.
 
 # 5. The Relative Power of Primitive Synchronization Operations
 
 ## Consensus Number
 * object가 consensus 문제를 해결할 수 있는 최대 thread 수
-* consensus number < N인 object를 이용해서 consensus number = N인 wait-free(or lock-free)한 object를 만들 수 없음
+* consensus number < N인 object를 이용해서 consensus number = N인 wait-free(or lock-free)한 object를 만들 수 없다. X로 Y를 구현했다면, n(X) ≥ n(Y)라는 의미이다.
   * No wait-free implementation of N-thread consensus from read-write atomic registers
   * -> Asynchronous computability is different from Turing computability
 * concurrent consensus object
-  * `object.decide(input)`의 output은 다음 조건을 만족함
+  * `thread object.decide(input)`의 `output`은 다음 조건을 만족함
   * _consistent_ : 모든 thread가 같은 값을 decide
   * _valid_ : decide된 값은 어떤 thread의 input
-  * `decide()`에 의해 처음으로 선택된 thread를 기준으로 해서 sequential consensus object으로 linearizable
+  * (위의 조건에 의하여) _Lock-free_ : 살아 있는 thread는 죽은 thread를 기다리지 않는다. 이후의 경쟁에서 계속 질수는 있다.
+  * `decide()`에 의해 처음으로 선택된 thread를 기준으로 해서 sequential consensus object으로 linearizable한다.
+  * decide 과정 중에 누가 죽어도 반드시 끝나야 한다. 그러니까 결과를 만들어 놓고, 대결을 해야 내가 죽더라도 남이 결과를 잘 들고간다.
 * consensus number 비교
-  * Atomic register는 1
-  * Multi-dequeuer FIFO-queue는 n 이상 (맨 처음 `deq()`한 thread의 값으로 decide)
-  * (n, n(n+1)/2)-Assignment Object는 n 이상
+  * Atomic register는 CN = 1이다.
+  * Multi-dequeuer FIFO-queue는 CN = 수용 가능한 dequeuer의 수이다. (맨 처음 `deq()`한 thread의 값으로 decide)
+  * (n, n(n+1)/2)-Assignment Object는 n 이상이다.
     * (총 n(n+1)/2 register에 n개를 동시에 write해서 덮어쓰인 쪽이 우선)
-  * X로 Y를 구현했다면, n(X) ≥ n(Y)
 
 ## Consensus protocol
-* decide를 위한 protocol의 state transition을 binary tree 형태로 나타냄 (edge: move, node: state)
-  * **bivalent** 어느 값이든 가능
-    * **critical state** 다음 move에 따라 0-valent 또는 1-valent로 나뉘는 bivalent
-    * protocol이 wait-free이면 언젠가는 critical state에 도달해야 함
-  * **univalent** 한 가지 값만 가능 (그 값이 무엇인지는 모를 수 있음)
-    * **x-valent** x만 가능 (ex. 0-valent, 1-valent)
-  * protocol의 모순으로부터 Atomic register로는 (n > 1) consensus 문제를 풀 수 없음을 증명
+* decide를 위한 protocol의 state transition을 binary tree 형태로 나타낼 수 있다. (edge: move, node: state)
+  * **bivalent** 어느 값이든 가능하다.
+    * **critical state** 다음 move에 따라 0-valent 또는 1-valent로 나뉘는 bivalent.
+    * protocol이 wait-free이면 언젠가는 critical state에 도달해야 한다.
+  * **univalent** 한 가지 값만 가능하다. (그 값이 무엇인지는 모를 수 있음)
+    * **x-valent** x만 가능하다. (ex. 0-valent, 1-valent)
+  * protocol의 모순으로부터 Atomic register로는 (n > 1) consensus 문제를 풀 수 없음을 증명하면 된다.
+    * 다음의 3가지 경우에 대해 테스트해보면 된다.
     * A가 read할 때 (A는 read만 하거나 안 하거나 했는데 결과가 달라짐)
     * A는 r0에, B는 r1에 write할 때 (A와 B가 다른데 썼는데 순서에 따라 결과가 달라짐)
     * A와 B가 모두 r에 write할 때 (B는 무조건 쓴다고 하면 덮어썼는데 결과가 달라짐)
+* multiple assignment를 이용하면 consensus protocol을 짤 수 있다. _TODO_
 
 ## Read-Modify-Write (RMW) Operation
-* register의 기존 값 x를 f(x)로 바꾸고 x(기존 값)를 반환하는 operation
+* register의 값이 x라면, 이를 f(x)로 갱신(Write)하고 x(old)를 반환(Read)하는 operation을 의미한다.
 * `get()` : f(x) = x
 * `get-and-set(v)` : f(x) = v
   * `test-and-set()` = `get-and-set(true)`
 * `get-and-increment()` : f(x) = x + 1
 * `fetch-and-add(k)` : f(x) = x + k
 * `compare-and-set(e, u)` : f(x) = if (x == e) then (x := u, true) else (false)
-  * `CAS(e, u)`는 x(기존 값)를 반환하지 않고 교체 여부(bool)를 반환함
-* nontrivial한 RMW register는 consensus number가 2 이상임 (Atomic register로는 불가능하므로 hardware에서 RMW method를 지원해야 함)
-  * `if (rmw(..) == init)`로 비교하여 i와 1-i 중 `decide()`할 수 있음
-    * running thread는 상대 thread가 sleep하더라도 `decide()`할 수 있어야 함
-  * 그러나 어떤 `rmw(...)`는 thread가 셋 이상일 때 누가 이겼는지 알 수 없음 (자기가 이겼는지 여부와 누가 이겼는지 여부를 다 알아야함)
-* Commute & Overwrite RMW object는 consensus number가 2임 ("weak" RMW instruction)
+  * `CAS(e, u)`는 특별히 x(기존 값)를 반환하지 않고 교체 여부(bool)를 반환한다.
+* nontrivial한 RMW register는 consensus number가 2 이상이다. (Atomic register로는 불가능하므로 hardware에서 RMW method를 지원해야 함)
+  * `if (rmw(..) == init)`로 비교하여 i와 1-i 중 `decide()`할 수 있다.
+    * running thread는 상대 thread가 죽거나 멈추더라도 `decide()`할 수 있어야 한다.
+  * 그러나 어떤 `rmw(...)`는 thread가 셋 이상일 때 누가 이겼는지 알 수 없다. (자기가 이겼는지 여부와 누가 이겼는지 여부를 다 알아야함)
+* Commute & Overwrite RMW object는 CN = 2이다. ("weak" RMW instruction)
   * commute: f(g(v)) = g(f(v))
   * overwrite: f(g(v)) = f(v)
-  * n > 2일 때, 누가 이겼는지 알 수 없다는 것을 binary tree를 이용해서 증명 (thread A, B, C)
-* `CAS(e, u)`는 consensus number가 ∞ (자기가 이겼는지를 return 값으로, 누가 이겼는지를 register 값으로 판단)
-* FIFO Queue, n-assignment 등은 consensus number가 충분한 RMW instruction (혹은 RMW register)를 이용하여 구현해야 함
+  * n > 2일 때, 누가 이겼는지 알 수 없다는 것을 binary tree를 이용해서 증명하면 된다. (thread A, B, C)
+* `CAS(e, u)`는 CN = ∞이다. (자기가 이겼는지를 return 값으로, 누가 이겼는지를 register 값으로 판단)
+* FIFO Queue, n-assignment 등은 consensus number가 충분한 RMW instruction (혹은 RMW register)를 이용하여 구현한다.
 
 # 6. Universality of Consensus
+
+## Universality
+* _TODO_
 
 # 7. Spin Locks and Contentions
 
