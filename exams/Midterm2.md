@@ -1,5 +1,4 @@
 # 분산시스템 중간고사2
-![Prof. Yoem](http://eng.snu.ac.kr/sites/default/files/professor/20100122135859.jpg)
 
 ## 2012 기출 (중간고사2)
 1. (SRSW, M-Valued, Regular)을 사용하여 어떻게 (SRSW, M-Valued, Atomic)을 만들 수 있겠는지 보이시오.
