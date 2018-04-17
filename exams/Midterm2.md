@@ -10,13 +10,21 @@
 
 ### 4번 소스 코드
 ```
-void lock() {
-  flag[i] = true;
-  victim = i;
-  while (flag[j] && victim == i);
+public void lock() {
+	flag[i] = true
+	victim = i
+	while (flag[j] && victim == i);
 }
 
-void unlock() {
-  flag[i] = false;
+public void unlock() {
+	flag[i] = false
 }
 ```
+
+## 2017 기출 (중간고사2)
+1. FetchAndAdd operation `fa(1, x)`, `fa(2, x)`, `fa(4, x)`, `fa(8, x)`을 값이 0인 것을 시작으로 적용하면 순서를 알 수 있다. 각자 bit가 다른 위치에 있기 때문에. 하지만 FAA는 consensus number가 2이다. 무엇이 잘못된 것인가?
+1. Skiplist based unbounded priority queue가 linearizable한가?
+1. Atomic 3-assignment를 이용하여 4 thread consensus가 가능한가?
+1. Multithread quicksort에서 Work(T1)와 CriticalPath(T∞)의 시간을 구하시오. (평균 혹은 최적과 최악)
+1. Recursive split ordering이 Concurrent hashing에 어떻게 이용되는가?
+1. Combining tree의 최적/최악의 경우에서의 throuput을 구하시오.
