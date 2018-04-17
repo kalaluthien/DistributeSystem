@@ -294,10 +294,10 @@
   * **update()**(자신의 thread id에 따라 지정된 array element에 write) & **scan()**(모든 array element를 read)
   * 쉽게 말해 multiple read에서 각 read를 동시에(하는 것처럼) 한다. multiple assignment는 consensus랑 연관되어 불가능하다.
   * 해결책: clean double collect
-    * read하는 thread는 **scan()**을 2번 해서 그 두 값이 동일하면 그것을 snapshot이라 하고, 같지 않으면 재시도한다. 이때, 값에다가 label이나 timestamp를 달아야 한다.
-    * 문제점은 **scan()**이 wait-free가 아니어서 starvation을 겪을 수 있다. 계속 누군가 **update()**를 하고 있으면 clean double collect에 계속해서 실패할 수 있다.
+    * read하는 thread는 **scan()** 2번 해서 그 두 값이 동일하면 그것을 snapshot이라 하고, 같지 않으면 재시도한다. 이때, 값에다가 label이나 timestamp를 달아야 한다.
+    * 문제점은 **scan()** = !wait-free이다. 따라서 starvation을 겪을 수 있다. 계속 누군가 **update()** 하고 있으면 clean double collect에 계속해서 실패할 수 있다.
   * 해결책: wait-free snapshot
-    * **update()**에서도 **scan()**을 한다.
+    * **update()** 에서도 **scan()** 한다.
 
 # 5. The Relative Power of Primitive Synchronization Operations
 
