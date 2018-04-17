@@ -10,13 +10,13 @@
 
 ### 4번 소스 코드
 ```
-public void lock() {
-	flag[i] = true
-	victim = i
-	while (flag[j] && victim == i);
+void lock() {
+  flag[i] = true;
+  victim = i;
+  while (flag[j] && victim == i);
 }
 
-public void unlock() {
-	flag[i] = false
+void unlock() {
+  flag[i] = false;
 }
 ```
