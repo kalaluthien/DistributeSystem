@@ -153,7 +153,7 @@
 * 어떤 object x에 pending된(inv-res 쌍을 이루지 못한) method call이 하나도 없을 때, 그때까지의 history와 동등한 어떤 sequential execution order (history)가 존재한다. 즉, 모든 x에 대하여 H|x와 동등한 S|x가 존재한다.
 * object가 quiescent한 구간(경계) 전후로 method 수행 순서가 보장된다. quiescent하지 않은 동안의 method 수행 순서는 program order조차 보장되지 않는다.
 * 수행 순서가 무관한 concurrent execution에서 유용하다. (OOO)
-* Quiescent Consistency는 _nonblocking_ correctness condition이며 compositinal하다.
+* Quiescent Consistency는 nonblocking and compositinal.
   * nonblocking: total method에 대한 임의의 pending call은 언제나 완료될 수 있다는 의미이다.
   * compositinal: 시스템 내의 각 object가 P를 만족할 때, 시스템 전체도 P를 만족하면 P는 compositinal한 correctness condition이라고 한다. Consistency에 대해 적용해보면 대충 `∀x:P(H|x) ⇒ P(H)`인 P라고 하면 될 것 같다. 다시 말해, 각 object들이 QC를 만족시키면 전체 history (system)도 QC를 만족시킨다.
 
@@ -204,10 +204,10 @@
 * 모든 liniearizable execution은 sequentially consistent하다. (역은 성립하지 않음) -> side effect moment를 기준으로 sequential order를 매기면 된다. 그 moment가 instant하다는 가정이다.
 * method가 side effect를 내는 linearization point를 찾아야 한다. (object의 state가 바뀌는 한 순간)
   * 항상 같은 line은 아닐 수도 있다.
-  * Lock 있음: critical section
+  * Lock 있음: critical section (하여튼 atomic하면 되니까)
   * Lock 없음: a single step
   * 보통은 method가 여러 군데 건드릴테니 그런 건 없다.
-* Linearizability는 _nonblocking_ correctness condition이며 compositinal하다.
+* Linearizability is nonblocking and compositinal.
 
 ## Progress Conditions
 * Blocking
@@ -216,6 +216,7 @@
 * Wait-free
   * (무한한 실행 동안) 모든 method call이 유한한 step 후에 종료되는것이 보장되는 경우를 말한다.
   * 모든 method가 wait-free인 object를 wait-free, 모든 instance가 wait-free인 class를 wait-free라고 한다. (참고)
+  * Wait-free이면 mutual exclusion이 없다.
 * Bounded wait-free
   * method call의 step에 pre-determined bound가 있는 경우를 말한다.
   * Bounded wait-free -> (unbounded) Wait-free이므로 bounded wait-free가 더 강력한 조건임을 알 수 있다.
@@ -225,9 +226,10 @@
   * Wait-free -> Lock-free 이므로 Wait-free가 더 강력한 조건임을 알 수 있다.
   * 만약 실행이 유한하다면 Wait-free = Lock-free (항상 어떤 method call이 유한한 step 후에 종료해야 하므로)
   * 일부 thread는 starvation을 겪을 수 있으나, 실제로는 거의 일어나지 않는다면 wait-free보다 실용적일 수 있다.
+  * Lock-free이면 lock이 없다.
 * Lock-free : Wait-free = Deadlock-free : Starvation-free
-  * Lock-free & Deadlock-free는 전체 thread group의 progress를 보장한다.
-  * Wait-free & Starvation-free는 개별 thread의 process을 보장한다.
+  * Lock-free & Deadlock-free는 "all threads"의 progress를 보장한다.
+  * Wait-free & Starvation-free는 "some threads"의 process을 보장한다.
 
 # 4. Foundations of Shared Memory
 
@@ -238,53 +240,63 @@
   * M-valued는 log(M)-bit라고도 할 수 있긴 한데, 뒤에서 M-valued를 construct할 때는 M-bit를 써서 One-Hot encoding 한다.
 * Safe ~ Regular ~ Atomic
   * Safe의 조건
-    * Read와 Write가 Sequential한 경우, 우리 생각되로 되어야 함.
-    * Read와 Write가 Concurrent한 경우, 무엇을 읽던간에 valid한 값(High-impedence 이런 거 안 됨)을 읽어야 한다. 예를 들어 1010에 0111을 쓰고 있는 동안 동시에 읽으면 1010이든 0111이든 0101이든 0000이든 다 상관 없고 0이랑 1로 되어있으면 됨.
+    * Read와 Write가 Sequential한 경우, 우리 생각대로 되어야 함.
+    * Read와 Write가 Concurrent한 경우, 무엇을 읽던 간에 valid한 값(High-impedence 이런 거 안 됨)을 읽어야 한다. 예를 들어 1010에 0111을 쓰고 있는 동안 동시에 읽으면 1010이든 0111이든 0101이든 0000이든 다 상관 없고 0이랑 1로 되어있으면 됨.
     * real-time order도 상관 없다. Read-Write-Read가 다 겹쳤을 때, 앞에서 update가 된 값을 잘 읽었더라도 뒤에서는 틀려도 된다.
   * Regular의 조건
-    * Safe에서 아무 valid → Old | New (역시 real-time order는 고려하지 않음)
-    * R<sup>i</sup> → W<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 미래에 쓰인 값을 읽는 경우)
-    * W<sup>i</sup> → W<sup>j</sup> → R<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 과거에 덮어쓰인 값을 읽는 경우)
+    * Safe의 아무 Valid → 항상 Old || New (역시 real-time order는 고려하지 않음)
+    * R<sup>i</sup> → W<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 미래에 쓰일 값을 읽는 경우)
+    * W<sup>i</sup> → W<sup>j</sup> → R<sup>i</sup> 인 경우는 존재하지 않음 (겹치지 않는 과거에 이미 덮어쓰인 값을 읽는 경우)
   * Atomic의 조건
     * 위의 조건과 더불어, R<sup>i</sup> -> R<sup>j</sup>일 때 i > j 인 경우는 존재하지 않음 (real-time order를 고려함)
     * 따라서 Atomic해지면 Read Write로 이루어진 history가 linearizable해진다.
-* Weakest Register : SRSW Safe Boolean
-  * 여기서부터 모든 다른 register(MRMW Atomic M-valued, Atomic Snapshot, etc)를 구성할 수 있음
-  * 하지만 Consensus hierarchy를 뛰어넘을 수는 없음 (concensus number = 1)
-* SRSW Safe Boolean -> MRSW Safe Boolean
-  * M개의 reader가 있을 때, 각 reader마다 SRSW를 하나씩 할당하면 MRSW가 된다. writer는 각 register마다 write를 하고, reader는 자신의 register를 읽는다.
-  * MRSW Safe Boolean = N * SRSW Safe Boolean
-* MRSW Safe Boolean -> MRSW Regular Boolean
+* Weakest Register: SRSW Safe Boolean
+  * SRSW로부터 다른 모든 레지스터와 mutual exclusion을 구현하려는 것이 챕터의 목표이다.
+  * 하지만 Consensus hierarchy를 뛰어넘을 수는 없다. (concensus number = 1)
+* SRSW Safe Boolean → MRSW Safe Boolean
+  * N개의 reader가 있을 때, 각 reader마다 SRSW를 하나씩 할당하면 MRSW가 된다.
+  * writer는 모든 register에 임의의 순서로 write를 하고, reader는 자신의 register를 읽는다.
+* MRSW Safe Boolean → MRSW Regular Boolean
   * 할당되어 있는 값과 바꿀 값이 동일하면 write하지 않는다.
   * 그러려면 writer가 local variable로 `old_value`를 들고 있으면 된다. 어차피 이거는 shared memory가 아니니까 아무 거나 상관 없다.
-* MRSW Regular Boolean -> MRSW Regular M-valued
-  * One-Hot encoding을 한다.
-  * MRSW를 M개 두고 `read()` 수행시 reader는 0 to M-1, `write(x)` 수행시 writer는 x to 0로 scan.
-  * reader는 old를 읽거나 new를 읽게 되므로 Regular하다.
-  * MRSW Regular M-valued = M * MRSW Regular Boolean
-* MRSW Regular -> SRSW Atomic
-  * writer는 `value:stamp`를 write하고, reader는 마지막으로 읽은 `value:stamp`를 local memory에 saved로 저장하여 `saved(value:stamp)`와 `read(value:stamp)` 중에서 stamp가 최신인 것을 read한다. 그리고 마지막으로 읽은 값을 saved에 update한다.
-  * SRSW Atomic = MRSW Regular M-valued + timestamp + reader's copy
-* SRSW Atomic -> MRSW Atomic
-  * SRSW를 (thread 수)<sup>2</sup>만큼 할당한다. (thread[1] = writer, thread[2:N] = reader)
-  * **writer**: column 1에 순서대로 write한다. 또는, 대각선으로 (1,1), (2,2), ..., (N, N)의 위치에다 write해도 된다.
+* MRSW Regular Boolean → MRSW Regular M-valued
+  * MRSW Regular Boolean register를 M개 가지고 One-Hot encoding을 한다.
+  * `read()` 수행시 reader는 0 to M-1으로 순회하면서 최초로 1이 되는 지점을 찾는다.
+  * `write(x)` 수행시 writer는 x to 0로 순회하면서 x에는 1을, x 이하에는 0을 대입한다.
+  * reader는 항상 old를 읽거나 new를 읽게 되므로 Regular하다.
+* MRSW Regular → SRSW Atomic
+  * Regular register는 Old || New를 읽어오고, overlap되지 않은 method call 사이의 순서를 보장한다. 그러나 overlap된 method call 사이의 real-time order가 보장되지 않는다.
+    * `r`의 초기값은 1이다.
+    * `A r.read()`
+    * `B r.write(2)`
+    * `A r:2`
+    * `A r.read()`
+    * `B r:void`
+    * `A r:1`
+    * H|A를 보면 `read(2)` → `read(1)`인데 이것이 모순이다.
+  * writer는 `value:stamp`를 write하고, reader는 마지막으로 읽은 `value:stamp`를 local memory에 saved로 저장하여 `saved(value:stamp)`와 `read(value:stamp)` 중에서 stamp가 최신인 것을 read한다. 그리고 마지막으로 읽은 값을 saved에 update한다. 이렇게 real-time order를 보장한다.
+  * 따라서 SRSW Atomic 만드는데 MRSW Regular M-valued + timestamp + reader's copy가 필요하다.
+* SRSW Atomic → MRSW Atomic
+  * SRSW Safe → MRSW Safe는 N개면 되는데, Atomic은 그것만으로는 linearizable하지 못해서 못쓴다. 왜냐면 Safe는 real-time order와 상관 없어서 그냥 reader 별로 1개씩 배당하고 writer가 거기 아무 순서로 써주고 reader는 아무 순서로 가져가도 "하여간에 writer가 값을 쓰는 중"이었으면 아무래도 상관이 없는데, Atomic register는 배당된 register를 reader가 읽을 때 다른 reader가 읽은 값(의 timestamp)에 따라 내 값(의 timestamp)이 그 이후의 것이 맞는지 체크할 수 있어야 real-time order를 보장한다.
+  * SRSW를 N<sup>2</sup>만큼 할당한다. (thread[1] = writer, thread[2:N] = reader)
+  * **writer**: column 1에 순서대로 write한다. _또는, 대각선으로 (1,1), (2,2), ..., (N, N)의 위치에다 write해도 된다._
   * **reader**: thread i는 row i의 최신값을 read하여 그 값을 column i에 순서대로 write한 후에 return한다.
-  * 이렇게 하면 다른 reader가 읽은 값을 놓치는 경우는 두 read가 겹쳤을 때 뿐이므로 이럴 때는 문제가 없다.
-  * MRSW Atomic = N<sup>2</sup> * SRSW Atomic
-* MRSW Atomic -> MRMW Atomic
-  * Bakery algorithm과 거의 동일하게, MRSW를 writer 수만큼 할당한다. (`label[n]`처럼)
-  * **writer**: array를 다 읽고 최신의 timestamp를 뽑아서 자기 자리에 write한다.
+  * 이렇게 하면 다른 reader가 읽은 값을 놓치는 경우는 두 read가 직접 겹쳤을 때 뿐이므로 이럴 때는 문제가 없다. 문제가 되었던 건 두 read가 직접 겹치지는 않는데 (즉, order가 있는데) 둘 다 writer랑 겹치는 경우이다.
+* MRSW Atomic → MRMW Atomic
+  * Bakery algorithm과 거의 동일하게, MRSW를 writer 수인 N만큼 할당한다. (`label[n]`처럼)
+  * **writer**: array를 다 읽고 다음 timestamp를 뽑아서 자기 자리에 write한다.
   * **reader**: array를 다 읽고 timestamp가 최신인 것을 read한다.
-  * max(timestamp) 받는 부분이 write order의 linearization point, max(timestamp) 읽는 부분이 read order의 linearization point이다.
+  * next(timestamp)가 write order의 linearization point, max(timestamp)가 read order의 linearization point이다.
     * 특정 code line이 linearization point가 아니고 실행에 따라 다르다는 것에 주의한다.
-  * MRMW Atomic = N * MRSW Atomic
-* Atomic Snapshot
-  * **update()**(한 array element에 write) & **scan()**(모든 array element를 read)
-  * 쉽게 말해 multiple read를 동시에 한다. multiple assignment는 consensus랑 연관되어 불가능하다.
+* SRMW Atomic → Atomic Snapshot
+  * SRMW/MRMW Atomic의 array를 이용하여, snapshot = multiple read를 수행하는 것을 말한다.
+    * Multi reader != Multiple read
+  * **update()**(자신의 thread id에 따라 지정된 array element에 write) & **scan()**(모든 array element를 read)
+  * 쉽게 말해 multiple read에서 각 read를 동시에(하는 것처럼) 한다. multiple assignment는 consensus랑 연관되어 불가능하다.
   * 해결책: clean double collect
-    * read하는 thread는 **scan()**을 2번 해서 그 두 값이 동일하면 그것을 snapshot이라 하고, 같지 않으면 재시도한다.
+    * read하는 thread는 **scan()**을 2번 해서 그 두 값이 동일하면 그것을 snapshot이라 하고, 같지 않으면 재시도한다. 이때, 값에다가 label이나 timestamp를 달아야 한다.
     * 문제점은 **scan()**이 wait-free가 아니어서 starvation을 겪을 수 있다. 계속 누군가 **update()**를 하고 있으면 clean double collect에 계속해서 실패할 수 있다.
-  * 해결책: wait-free snapshot _TODO_
+  * 해결책: wait-free snapshot
     * **update()**에서도 **scan()**을 한다.
 
 # 5. The Relative Power of Primitive Synchronization Operations
@@ -292,38 +304,38 @@
 ## Consensus Number
 * object가 consensus 문제를 해결할 수 있는 최대 thread 수
 * consensus number < N인 object를 이용해서 consensus number = N인 wait-free(or lock-free)한 object를 만들 수 없다. X로 Y를 구현했다면, n(X) ≥ n(Y)라는 의미이다.
-  * No wait-free implementation of N-thread consensus from read-write atomic registers
-  * -> Asynchronous computability is different from Turing computability
 * concurrent consensus object
   * `thread object.decide(input)`의 `output`은 다음 조건을 만족함
   * _consistent_ : 모든 thread가 같은 값을 decide
   * _valid_ : decide된 값은 어떤 thread의 input
-  * (위의 조건에 의하여) _Lock-free_ : 살아 있는 thread는 죽은 thread를 기다리지 않는다. 이후의 경쟁에서 계속 질수는 있다.
+  * (위의 조건에 의하여) _Lock-free_ : 살아 있는 thread는 죽은 thread를 기다리지 않는다. 이후의 경쟁에서 계속 질 수는 있다.
   * `decide()`에 의해 처음으로 선택된 thread를 기준으로 해서 sequential consensus object으로 linearizable한다.
   * decide 과정 중에 누가 죽어도 반드시 끝나야 한다. 그러니까 결과를 만들어 놓고, 대결을 해야 내가 죽더라도 남이 결과를 잘 들고간다.
 * consensus number 비교
-  * Atomic register는 CN = 1이다.
-  * Multi-dequeuer FIFO-queue는 CN = 수용 가능한 dequeuer의 수이다. (맨 처음 `deq()`한 thread의 값으로 decide)
-  * (n, n(n+1)/2)-Assignment Object는 n 이상이다.
-    * (총 n(n+1)/2 register에 n개를 동시에 write해서 덮어쓰인 쪽이 우선)
+  * Atomic register의 CN = 1이다.
+  * Multi-dequeuer FIFO-queue의 CN = 수용 가능한 dequeuer의 수이다. (맨 처음 `deq()`한 thread의 값으로 decide)
+  * n-Assignment Object의 CN = (2n-2)이다. 거꾸로, CN = k이려면 (k+1)/2+1 assignment가 가능해야 한다.
+    * 토너먼트 방식으로 컨센서스를 진행하면 된다. 처음에는 2개씩 2-assignment를 하고, 그 다음에는 4개씩 3-assignment를 하고, ...
 
 ## Consensus protocol
-* decide를 위한 protocol의 state transition을 binary tree 형태로 나타낼 수 있다. (edge: move, node: state)
-  * **bivalent** 어느 값이든 가능하다.
+* Decide를 위한 protocol의 state transition을 binary tree 형태로 나타낼 수 있다. (edge: move, node: state)
+  * **bivalent** 0과 1 중 어느 값이든 가능하다.
+    * subtree의 leaf node의 값에 0도 있고 1도 있다는 의미이다.
     * **critical state** 다음 move에 따라 0-valent 또는 1-valent로 나뉘는 bivalent.
     * protocol이 wait-free이면 언젠가는 critical state에 도달해야 한다.
   * **univalent** 한 가지 값만 가능하다. (그 값이 무엇인지는 모를 수 있음)
-    * **x-valent** x만 가능하다. (ex. 0-valent, 1-valent)
+    * **0-valent** 0만 가능하다.
+    * **1-valent** 1만 가능하다.
   * protocol의 모순으로부터 Atomic register로는 (n > 1) consensus 문제를 풀 수 없음을 증명하면 된다.
-    * 다음의 3가지 경우에 대해 테스트해보면 된다.
-    * A가 read할 때 (A는 read만 하거나 안 하거나 했는데 결과가 달라짐)
-    * A는 r0에, B는 r1에 write할 때 (A와 B가 다른데 썼는데 순서에 따라 결과가 달라짐)
-    * A와 B가 모두 r에 write할 때 (B는 무조건 쓴다고 하면 덮어썼는데 결과가 달라짐)
-* multiple assignment를 이용하면 consensus protocol을 짤 수 있다. _TODO_
+    * Critical state로부터 시작한다고 가정한다.
+    * `x.read()`, `y.read()`, `x.write()`, `y.write()` 이 4가지의 operation에 대해 A와 B가 interaction하므로, 4 x 4 테이블을 작성해보면 된다. 즉, 다음의 3가지 경우에 대해 테스트해보면 된다.
+    * A나 B가 같거나 다른 register에 read할 때 (read만 하거나 안 하거나 했는데 결과가 달라짐) → ⊥
+    * A와 B가 서로 다른 register에 write할 때 (A와 B가 다른데 썼는데 AB 순서에 따라 결과가 달라짐) → ⊥
+    * A와 B가 서로 같은 register에 write할 때 (A가 B를 덮어썼다고 하면 그냥 A만 쓴 것인데 결과가 달라짐) → ⊥
 
 ## Read-Modify-Write (RMW) Operation
 * register의 값이 x라면, 이를 f(x)로 갱신(Write)하고 x(old)를 반환(Read)하는 operation을 의미한다.
-* `get()` : f(x) = x
+* `identity(x)` : f(x) = x
 * `get-and-set(v)` : f(x) = v
   * `test-and-set()` = `get-and-set(true)`
 * `get-and-increment()` : f(x) = x + 1
@@ -333,18 +345,23 @@
 * nontrivial한 RMW register는 consensus number가 2 이상이다. (Atomic register로는 불가능하므로 hardware에서 RMW method를 지원해야 함)
   * `if (rmw(..) == init)`로 비교하여 i와 1-i 중 `decide()`할 수 있다.
     * running thread는 상대 thread가 죽거나 멈추더라도 `decide()`할 수 있어야 한다.
-  * 그러나 어떤 `rmw(...)`는 thread가 셋 이상일 때 누가 이겼는지 알 수 없다. (자기가 이겼는지 여부와 누가 이겼는지 여부를 다 알아야함)
+  * 그러나 어떤 `rmw(...)`는 thread가 셋 이상일 때 누가 이겼는지 알 수 없다. 자기가 이겼는지 여부와 누가 이겼는지 여부를 다 알아야하는데, 둘이면 내가 졌으면 남이 이긴건데 셋부터는 그런 거 없다.
 * Commute & Overwrite RMW object는 CN = 2이다. ("weak" RMW instruction)
   * commute: f(g(v)) = g(f(v))
   * overwrite: f(g(v)) = f(v)
-  * n > 2일 때, 누가 이겼는지 알 수 없다는 것을 binary tree를 이용해서 증명하면 된다. (thread A, B, C)
+  * n > 2일 때, 누가 이겼는지 알 수 없다는 것을 binary tree를 이용해서 증명하면 된다.
+    * thread A, B, C가 있을 때, A와 B가 다른 순서로 연산을 적용한 뒤 (그러면 상태가 동일) C가 계속 돌면 최종 결과가 같아야 하는데, Critical state에서는 다른 결과가 나오므로 모순이다.
+    * thread A, B, C가 있을 때, A만 연산을 적용하거나 B→A 순으로 연산을 적용한 뒤 (그러면 상태가 동일) C가 계속 돌면 최종 결과가 같아야 하는데, Critical state에서는 다른 결과가 나오므로 모순이다.
 * `CAS(e, u)`는 CN = ∞이다. (자기가 이겼는지를 return 값으로, 누가 이겼는지를 register 값으로 판단)
 * FIFO Queue, n-assignment 등은 consensus number가 충분한 RMW instruction (혹은 RMW register)를 이용하여 구현한다.
 
 # 6. Universality of Consensus
 
 ## Universality
-* _TODO_
+* Consensus는 Universal하다.
+* n-thread consensus protocol이 있다면, 이를 이용하여 어떤 Sequential object에 대해 Wait-free, Linearizable, n-threaded version을 만들 수 있다.
+  * Sequential object는 method `Apply: Invocation → Response`를 가지고 있다.
+  * thread들이 날린 query에 대한 linked list를 만든다.
 
 # 7. Spin Locks and Contentions
 
