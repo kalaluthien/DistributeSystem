@@ -1,5 +1,4 @@
 # 분산시스템 중간고사1
-![Prof. Yoem](http://eng.snu.ac.kr/sites/default/files/professor/20100122135859.jpg)
 
 ## 2012 기출 (중간고사)
 1. Test-and-set instruction을 사용하면 mutual exclusion을 해결할 수 있지만 n-thread consensus는 해결할 수 없다. 무슨 차이가 있는지 설명하시요.
