@@ -359,21 +359,72 @@
 
 ## Universality
 * Consensus는 Universal하다.
-* n-thread consensus protocol이 있다면, 이를 이용하여 어떤 Sequential object에 대해 Wait-free, Linearizable, n-threaded version을 만들 수 있다.
+* n-thread consensus protocol이 있다면, 항상 이를 이용하여 어떤 Sequential object에 대해 Wait-free, Linearizable, n-threaded version을 만들 수 있다.
   * Sequential object는 method `Apply: Invocation → Response`를 가지고 있다.
-  * thread들이 날린 query에 대한 linked list를 만든다.
+* Naive Idea
+  * 일단 object가 현재 cell에 대한 포인터를 들고 있도록 한다.
+  * thread는 그 포인터가 가리키는 cell을 복사해서 연산을 수행한 뒤, object의 포인터를 결과물로 바꾼다.
+* Lock-free universal construction
+  * head 배열이 있고, thread i는 head[i]를 업데이트한다.
+  * head[i]는 thread들이 날린 query의 list node들을 가리키는데, max(head)를 택하면 node 중 가장 seq 넘버가 높은 것을 가리키게 된다.
+  * head가 하나만 있으면 thread들이 같은 곳을 update하려고 하므로 거기서 consensus를 해야 하는데, 애초에 list를 쓰는 이유가 consensus object가 일회용이기 때문. 따라서 head는 경쟁이 없어야 한다.
+  * 각각의 node에는 query하고 consensus object가 들어있다. 새로운 method call이 들어오면 그걸 object에 적용하는 게 아니라 contension하는 thread끼리 decide해서 승자의 것을 list에다 매단다. 그 다음, tail부터 쭉쭉 list의 query들을 apply한 결과를 만들어서 승자에게 반환한다.
+  * 증간에 매단 thread가 죽어도 매달린 node는 남아 있으므로 다음 thread는 올바른 결과를 가져갈 수 있어서 상관없다.
+* Wait-free universal construction
+  * Lock-free construction + announce array (실패한 query를 넣어놓음)
+  * announce array를 이용하여, 내가 실패해도 재시도하지 않고 남이 해준다.
+* Shared memory computability는 Turing computability처럼 가능성에만 신경을 쓴다.
+  * Wait-free/Lock-free computable = threads with n-consensus objects
 
 # 7. Spin Locks and Contentions
+* TAS lock
+  * TestAndSet을 계속하여 수행하여, 0을 1로 바꾼 thread만 critical section으로 진입한다.
+  * TestAndSet은 1을 1로 바꾼다 하더라도 update이기 때문에 cache miss를 유도한다.
+```
+lock():
+  while (TAS(s, 1) == 1) {}
+
+unlock():
+  s = 0
+```
+* TTAS lock
+  * TestAndSet을 시도하기 전에, cache에 올려두고 계속 그걸 확인하도록 해서 overhead를 줄인다.
+  * Cache를 누군가 invalidate 시켜주면 일부 thread는 s를 새로 읽어와 0을 보고 TAS를 시도한다.
+```
+lock():
+  do {
+    while (s) {}
+  } whlie(TAS(s, 1) == 1)
+
+unlock():
+  s = 0
+```
+* L1 and L2 caches
+  * L1은 1~2 cycle이지만, L2는 10~ cycle이다.
+  * Write-back cache를 사용하면 항상 flush 하지 않고, cache에 변경 사항을 누적시키다가 evict되면 memory에 write back한다.
+  * 그러면 다른 프로세서의 cache line을 invalidate해야 하므로 Bus-based architecture에 적절한 Cache coherence protocal을 사용한다.
+* Exponential backoff lock
+  * TAS는 항상 바쁘고, TTAS는 일부 시점에 몰린다.
+  * backoff를 주는 것만으로 경쟁을 줄일 수 있고, 구현이 간단하다.
+  * 근데 상수에 따라 성능이 달라지는 등 portability가 좋지 않다.
+* Anderson queue lock
+* CLH queue lock
+* MCS queue lock
 
 # 8. Monitors and Blocking Synchronization
+_TODO_
 
 # 9. Linked Lists: The Role of Locking
+_TODO_
 
 # 10. Concurrent Queues and the ABA Problem
+_TODO_
 
 # 11. Concurrent Stacks and Elimination
+_TODO_
 
 # 12. Counting, Sorting, and Distributed Coordination
+_TODO_
 
 # 13. Concurrent Hashing and Natural Parallelism
 
