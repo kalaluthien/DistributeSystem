@@ -295,9 +295,10 @@
   * 쉽게 말해 multiple read에서 각 read를 동시에(하는 것처럼) 한다. multiple assignment는 consensus랑 연관되어 불가능하다.
   * 해결책: clean double collect
     * read하는 thread는 **scan()** 2번 해서 그 두 값이 동일하면 그것을 snapshot이라 하고, 같지 않으면 재시도한다. 이때, 값에다가 label이나 timestamp를 달아야 한다.
-    * 문제점은 **scan()** = !wait-free이다. 따라서 starvation을 겪을 수 있다. 계속 누군가 **update()** 하고 있으면 clean double collect에 계속해서 실패할 수 있다.
+    * 문제점은 **scan()** 하는 것이 wait-free가 아니다. 따라서 starvation을 겪을 수 있다. 계속 누군가 **update()** 하고 있으면 clean double collect에 계속해서 실패할 수 있다.
   * 해결책: wait-free snapshot
-    * **update()** 에서도 **scan()** 한다.
+    * **update()** 에서도 collect한다.
+    * **scan()** 하는 쪽에서 3번째 collect를 할 때, **update()** 하는 thread의 snapshot을 가져울 수 있다. 3번째에서 문제가 없으면 그냥 자기 snapshot 쓰면 된다.
 
 # 5. The Relative Power of Primitive Synchronization Operations
 
@@ -399,32 +400,77 @@ lock():
 unlock():
   s = 0
 ```
-* L1 and L2 caches
-  * L1은 1~2 cycle이지만, L2는 10~ cycle이다.
+* Cache coherence
   * Write-back cache를 사용하면 항상 flush 하지 않고, cache에 변경 사항을 누적시키다가 evict되면 memory에 write back한다.
-  * 그러면 다른 프로세서의 cache line을 invalidate해야 하므로 Bus-based architecture에 적절한 Cache coherence protocal을 사용한다.
+  * 그러면 다른 프로세서의 cache line을 invalidate해야 하므로 Bus-based architecture에 적절한 Cache coherent protocal을 사용한다.
 * Exponential backoff lock
   * TAS는 항상 바쁘고, TTAS는 일부 시점에 몰린다.
   * backoff를 주는 것만으로 경쟁을 줄일 수 있고, 구현이 간단하다.
   * 근데 상수에 따라 성능이 달라지는 등 portability가 좋지 않다.
 * Anderson queue lock
+  * array로 queue를 만든다.
+  * 초기에, next는 True인 flag[0]을 가리키고 나머지 flag는 False이다. next 포인터에 GetAndIncrement 연산을 수행한다. array 접근에 mod 연산을 넣어서 circular queue가 되도록 한다.
+  * `lock()`: next 포인터에 GetAndIncrement하고, 이전 값(RMW로 들고온)의 flag가 True이면 lock을 얻은 상태, False이면 해당 flag에 spinlock 도는 상태가 된다.
+  * `unlock()`: 자신이 사용했던 flag의 다음 flag를 True로 바꿔주고 자신의 flag를 False로 바꾼다. (next는 어디 가있을 지 모르니까 안 건드림)
+  * Cache line의 크기에 따라 false sharing이 일어날 수 있는데 그냥 적당히 padding 넣어주면 된다.
+  * 장점: TAS, TTAS와는 달리 scalable한 throughput을 보여준다. FCFS이므로 fair하다.
+  * 단점: lock을 위한 메모리를 너무 많이 잡아먹는다.
 * CLH queue lock
+  * linked list로 queue를 만든다. 실제 linked list가 아니고 implicit linked list다.
+  * 초기에, tail이 False node를 가리킨다. False가 lock을 잡은 것, True는 spinlock을 도는 것이다. 근데 이게 맞는게 무한루프 돌아야 하는데 변수가 True이면 not 안 붙여도 되니까.
+  * `lock()`: True node를 만들어서 tail과 자신의 node의 포인터를 Swap한다. 받아온 node가 False이면 lock을 잡은 것이고, True이면 cache로 가져와 spinlock을 돈다.
+    * 자신이 만들었던 node의 포인터를 가지고 있어서 implicit linked list다. next에게 무언가 알려 줄 수 있기 때문.
+  * `unlock()`: 자신이 잡고 있던 lock node의 next(= 자신이 만들었던 node)의 값을 True에서 False로 바꿔준다. 그러면 cache invalidate가 가니까 memory에서 들고 오든지 옆 cache에서 받아 오든지 해서 False를 받게 됨.
+  * 장점: Anderson queue lock은 O(LN) 메모리를 잡아먹는데, CLH queue lock은 O(L+N) 메모리를 잡아먹게 되므로 공간을 덜 쓴다.
 * MCS queue lock
+  * 남이 만들어 준 node에 대고 spinlock을 돌면 NUMA architecture에서는 remote memory access를 해야 해서 자기 cache에 못 올리던지, 하여튼 복잡해져서 느려진다.
+  * 진짜 linked list로 queue를 만들고 자기가 만든 node에 대고 spinlock을 돌게 한다.
+  * CLH lock하고 Swap은 똑같이 하는데, next를 thread가 들고 있는 게 아니라 node에 넣어둔다. 그리고 release할 때 그거 타고 가서 True to False 해주면 된다.
 
 # 8. Monitors and Blocking Synchronization
 _TODO_
 
 # 9. Linked Lists: The Role of Locking
-_TODO_
+* Cocurrent object pattern
+  * Coarse-Grained Synch: 그냥 lock 하나 잡고 critical section에서 수행한다.
+  * Fine-Grained Synch: lock을 object의 여러 부분에 독립적으로 할당한다. 따라서 서로 병렬적으로 read/write될 수 있는 부분에서 경쟁이 발생하지 않게 한다.
+  * Optimistic Synch: 일단 lock을 잡지 않고 search를 한다. read/write할 부분을 찾았다면 lock을 잡은 후, 검사한다. (search와 locking 사이의 update를 감지) 검사 결과 update가 있었다면 처음부터 다시 시도한다.
+    * fine-grained locking보다 싸지만, 실패 시 overhead가 크다.
+    * access pattern이 어떤가에 따라 시도해야 한다. 기본 overhead만 걸리는 case가 많은 경우에 쓰면 좋다.
+  * Lazy Synch: Logical removal과 Physical removal으로 나눈다. Logical removal에서는 단순히 마킹을 하고, Physical removal에서는 실제로 지운다.
+  * Lock-free Synch: CAS나 비슷한 연산을 사용한다. Robust but compex. 구현이 복잡하고, 종종 overhead가 크다.
+* Linked List: Set
+  * 세 가지 연산 `add(x)`, `remove(x)`, `contains(x)`을 지원한다.
+  * 앞뒤로 centinel node가 있고, 그 사이에 key들이 singly linked list로 연결된 구조를 생각하자.
+  * Invariant (불변량)
+    * method 실행 전 후로 항상 보존되어야 하는 성질
+    * 예를 들어 정렬되어 있다, 중복이 없다, head to tail 경로가 존재한다 등등.
+  * Hand-over-Hand locking - Fine-Grained Synch
+    * Linked list를 순회할 때, 각 node별로 lock을 할당하고 lock을 2개씩 잡는 것.
+    * `remove()`
+      * (lock을 하나만 잡을 때) { a, b, c, d }에서 b와 c를 각각 지우러 왔을 때, b를 지우기 위해 a→c를 연결하고 c를 지우기 위해 b→d를 연결해서 최종적으로 { a, c, d }가 되는 문제가 생긴다. b를 지울 때는 a에  lock을 잡고, c를 지울 때는 b에 lock을 잡아서 그렇다. 따라서 지우고자 하는 node의 lock도 잡아야 한다. 즉, b를 지울 때는 a와 b의 lock을 잡고, c를 지울 때는 b와 c의 lock을 잡는다.
+      * 정리: e를 지울 때, e.prev만 잡지 말고, e와 e.prev를 모두 잡는다. 거꾸로, 누군가 e를 잡고 있다면 다른 어떤 thread도 e와 e.next를 지울 수 없다.
+    * `add()`
+      * 비슷하게, e를 추가하고자 하면 (미래의) e.prev와 e.next를 잡는다.
+  * Optimistic Synch
+   * 순회 하다가, 대상이 되는 부분을 발견하면 lock을 잡고, 다시 순회하여 validation한다.
+     * e1과 e2에 lock을 걸었다면, e1이 accessible이고 e2가 e1.next이면 된다.
+   * 장점: Traversal이 wait-free이다. lock을 계속 잡는 것보다는 traversal을 2번하는 것이 싸다.
+   * 단점: 그래도 `contains()`는 lock을 잡는다. 근데 대부분의 경우 `contains()`의 호출이 가장 많다.
+  * Lazy Synch
+    * Optimistic과 비슷하게 Traversal에서 lock을 잡지 않는다. 그러나, Traversal은 1번만 수행하며, `contains()`는 lock을 잡지 않는다. `add()`나 `remove()`에서는 curr와 prev의 lock을 잡는데, 처음부터 다시 순회하는 것이 아니라 mark 여부를 확인하면 된다. 즉, prev가 access 가능한 지 체크하는 대신, prev와 curr의 mark 여부를 체크한다.
+    * Logical delete: `node.mark = DELETED;`
+    * Physical delete: `node.prev = node.next;`
+    * `contains()`는 wait-free이지만 여전히 `add()`나 `remove()`가 lock-free가 아니다. lock이 있으면 critical section에 들어간 thread를 항상 기다려야 한다...
+  * Lock-free Synch
+    * CAS와 Logical delete marking을 이용한다. 그런데 이를 한번에 하기 위해, Logical removal 자체를 next 포인터에다 대고 Bit masking한다. 그러면 누군가 Logical delete한 것을 CAS로 확인할 수 있다.
+    * `remove()`: a→b→c에서 b를 지운다고 하면, b에 marking하고 CAS(a.next, c)한다. CAS가 실패해도 b는 marking되어 있으므로 상관 업다.
 
 # 10. Concurrent Queues and the ABA Problem
-_TODO_
 
 # 11. Concurrent Stacks and Elimination
-_TODO_
 
 # 12. Counting, Sorting, and Distributed Coordination
-_TODO_
 
 # 13. Concurrent Hashing and Natural Parallelism
 
