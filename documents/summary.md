@@ -378,6 +378,8 @@
   * Wait-free/Lock-free computable = threads with n-consensus objects
 
 # 7. Spin Locks and Contentions
+
+## One variable lock
 * TAS lock
   * TestAndSet을 계속하여 수행하여, 0을 1로 바꾼 thread만 critical section으로 진입한다.
   * TestAndSet은 1을 1로 바꾼다 하더라도 update이기 때문에 cache miss를 유도한다.
@@ -407,6 +409,8 @@ unlock():
   * TAS는 항상 바쁘고, TTAS는 일부 시점에 몰린다.
   * backoff를 주는 것만으로 경쟁을 줄일 수 있고, 구현이 간단하다.
   * 근데 상수에 따라 성능이 달라지는 등 portability가 좋지 않다.
+
+## Queue lock
 * Anderson queue lock
   * array로 queue를 만든다.
   * 초기에, next는 True인 flag[0]을 가리키고 나머지 flag는 False이다. next 포인터에 GetAndIncrement 연산을 수행한다. array 접근에 mod 연산을 넣어서 circular queue가 되도록 한다.
@@ -431,12 +435,13 @@ unlock():
 _TODO_
 
 # 9. Linked Lists: The Role of Locking
+
 ## Cocurrent object pattern
 * Coarse-Grained Synch: 그냥 lock 하나 잡고 critical section에서 수행한다.
 * Fine-Grained Synch: lock을 object의 여러 부분에 독립적으로 할당한다. 따라서 서로 병렬적으로 read/write될 수 있는 부분에서 경쟁이 발생하지 않게 한다.
-* Optimistic Synch: 일단 lock을 잡지 않고 search를 한다. read/write할 부분을 찾았다면 lock을 잡은 후, 검사한다. (search와 locking 사이의 update를 감지) 검사 결과 update가 있었다면 처음부터 다시 시도한다.
+* Optimistic Synch: double clean. 일단 lock을 잡지 않고 search한다. read/write할 부분을 찾았다면 lock을 잡은 후, validate한다. (search와 locking 사이의 update를 감지) 검사 결과 update가 있었다면 처음부터 retry한다.
   * fine-grained locking보다 싸지만, 실패 시 overhead가 크다.
-  * access pattern이 어떤가에 따라 시도해야 한다. 기본 overhead만 걸리는 case가 많은 경우에 쓰면 좋다.
+  * access pattern에 따라 적용해야 한다.
 * Lazy Synch: Logical removal과 Physical removal으로 나눈다. Logical removal에서는 단순히 마킹을 하고, Physical removal에서는 실제로 지운다.
 * Lock-free Synch: CAS나 비슷한 연산을 사용한다. Robust but compex. 구현이 복잡하고, 종종 overhead가 크다.
 
@@ -469,9 +474,85 @@ _TODO_
 
 # 10. Concurrent Queues and the ABA Problem
 
+## Lock-free queue
+* Logical enqueue: CAS를 이용, 실패시 재시도한다.
+* Physical enqueue: CAS를 이용, 실패시 아무 것도 하지 않는다.
+* dequeue: CAS를 이용, 실패시 재시도한다.
+
+## Bounded queue
+* `head → centinel → items... → last item ← tail`의 구조로 되어 있다.
+* deqLock과 enqLock을 사용한다. (일종의 fine-grained locking)
+* permits = remain capacity (shared memory)
+  * 0: full, N: empty
+  * `enq() { GetAndDecrement(pemits) }`, `deq() { GetAndIncrement(permits) }`
+* permit과 lock의 update 순서는 상관 없다.
+
+## Monitor lock
+* Lock + Condition
+* 다음과 같은 순서로 작동한다.
+  * `L: aquire()`
+  * `if condition() then`
+    * `release()`
+    * `sleep()` ← `awaken()`
+    * `goto L`
+* `awaken()`에서 하나만 깨울 수도 있고, 다 깨울 수도 있다. 하나만 깨우는 경우는 `awaken()` 신호가 씹힐 수 있기 때문에 다 깨우는 게 좋은데, 이건 또 경쟁이 순간적으로 심해지게 된다.
+  * Lost wake-UP: 2개가 empty에 dequeue해서 waiting하고 있고, 2개가 enqueue를 하면서 signal을 날렸는데 그 2개가 모두 waiting list의 첫 번째 thread에만 날아가버리는 경우를 말한다. 첫 번째 thread가 바로 빠져나오지 못해서 생기는 문제이다.
+
+## ABA problem
+* GC를 하고 다시 allocation 받아온 노드가 주소가 똑같아서 CAS가 성공해버린다.
+* 시나리오
+  * `deq()`를 호출하고 thread가 잔다.
+  * 그 동안 누군가 `deq()`를 해버리고, 작업을 하다가 다시 centinel이 free pool에서 돌아온다. (원래는 `deq()`하면 centinel이 사라지고 다음 node가 centinel이 되는 구조)
+  * centinel이 주소가 동일해서 CAS는 성공하는데, queue 구조가 전혀 달라졌으므로 망한다.
+* 해결책
+  * Atomic stamped reference
+
 # 11. Concurrent Stacks and Elimination
 
+## Lock-free stack
+* `top → items... → centinel`의 구조로 되어 있다.
+* Logical push: node를 만들어 node.next = top을 수행한다.
+* Physical push: CAS로 top = node를 수행한다.
+* pop: 일단 read해온 다음, CAS로 top = top.next를 수행한다.
+* Lock-free queue와 마찬가지로 ABA problem이 생긴다.
+* 넣든 빼든 top에 경쟁이 생기므로 parallel하지 않다. concurrent하기만 하다.
+  * cf. queue는 넣을 때랑 뺄 때는 각각 tail과 head에 접근하므로 parallel하다.
+
+## Elimination backoff stack
+* Invariant를 성립시키기 쉽고 Linearizable하다.
+* push-pop 쌍을 elimination array에서 매칭시켜 빼주면 된다.
+* 시나리오
+  * 일단 CAS로 push/pop 시도를 해보고, 실패시 backoff한다.
+  * backoff시 array의 random index를 골라 CAS로 state를 바꿔주고 spinlock한다.
+  * push랑 pop이 만나면 적당히 교환해준다. CAS로 item과 state를 동시에 바꿔야한다.
+
 # 12. Counting, Sorting, and Distributed Coordination
+
+## Shared counter
+* Shared counter가 만족시켜야 하는 성질
+  * No duplication
+  * No Omission
+  * Not necessarily linearizable
+
+## Combining tree
+* Concept
+  * 둘씩 경쟁해서 stamp를 뽑아와서 트리 구조를 이룬다.
+  * counter에서 range를 뽑아올 수 있다.
+  * Linearizable하다. (Why?)
+* Combining Status
+  * IDLE, FIRST, SECOND, DONE, ROOT
+* Phases
+  * Precombining - IDLE이면 타고 올라가면서 FIRST로 바꾼다. FIRST이면 SECOND로 바꾸고 lock을 잡은 다음 끝낸다. ROOT이면 끝낸다. 어디까지 올라갔는지만 기록한다.
+  * Combining - SECOND이면 lock을 잡은 애는 자고, lock을 잡지 않은 애는 더해서 올라간다. FIRST이면 누가 못 올라오게 lock을 잡고 올라간다. 밟아 올라간 state를 모두 기록한다.
+  * Operation
+  * Distribution
+* Throughput
+  * Ideal case: n thread가 동시에 오면 O(logn)만에 combining된다. (High contention)
+  * Worst case: n thread가 차례로 오는데 latancy가 O(logn)이므로 O(nlogn)이 된다. (Low contention)
+  * Load fluctuation: 성능이 load 크기에 민감해서 막 출렁인다.
+
+## Balancer
+_TODO_
 
 # 13. Concurrent Hashing and Natural Parallelism
 
