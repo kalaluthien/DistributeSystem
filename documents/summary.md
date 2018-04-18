@@ -431,40 +431,41 @@ unlock():
 _TODO_
 
 # 9. Linked Lists: The Role of Locking
-* Cocurrent object pattern
-  * Coarse-Grained Synch: 그냥 lock 하나 잡고 critical section에서 수행한다.
-  * Fine-Grained Synch: lock을 object의 여러 부분에 독립적으로 할당한다. 따라서 서로 병렬적으로 read/write될 수 있는 부분에서 경쟁이 발생하지 않게 한다.
-  * Optimistic Synch: 일단 lock을 잡지 않고 search를 한다. read/write할 부분을 찾았다면 lock을 잡은 후, 검사한다. (search와 locking 사이의 update를 감지) 검사 결과 update가 있었다면 처음부터 다시 시도한다.
-    * fine-grained locking보다 싸지만, 실패 시 overhead가 크다.
-    * access pattern이 어떤가에 따라 시도해야 한다. 기본 overhead만 걸리는 case가 많은 경우에 쓰면 좋다.
-  * Lazy Synch: Logical removal과 Physical removal으로 나눈다. Logical removal에서는 단순히 마킹을 하고, Physical removal에서는 실제로 지운다.
-  * Lock-free Synch: CAS나 비슷한 연산을 사용한다. Robust but compex. 구현이 복잡하고, 종종 overhead가 크다.
-* Linked List: Set
-  * 세 가지 연산 `add(x)`, `remove(x)`, `contains(x)`을 지원한다.
-  * 앞뒤로 centinel node가 있고, 그 사이에 key들이 singly linked list로 연결된 구조를 생각하자.
-  * Invariant (불변량)
-    * method 실행 전 후로 항상 보존되어야 하는 성질
-    * 예를 들어 정렬되어 있다, 중복이 없다, head to tail 경로가 존재한다 등등.
-  * Hand-over-Hand locking - Fine-Grained Synch
-    * Linked list를 순회할 때, 각 node별로 lock을 할당하고 lock을 2개씩 잡는 것.
-    * `remove()`
-      * (lock을 하나만 잡을 때) { a, b, c, d }에서 b와 c를 각각 지우러 왔을 때, b를 지우기 위해 a→c를 연결하고 c를 지우기 위해 b→d를 연결해서 최종적으로 { a, c, d }가 되는 문제가 생긴다. b를 지울 때는 a에  lock을 잡고, c를 지울 때는 b에 lock을 잡아서 그렇다. 따라서 지우고자 하는 node의 lock도 잡아야 한다. 즉, b를 지울 때는 a와 b의 lock을 잡고, c를 지울 때는 b와 c의 lock을 잡는다.
-      * 정리: e를 지울 때, e.prev만 잡지 말고, e와 e.prev를 모두 잡는다. 거꾸로, 누군가 e를 잡고 있다면 다른 어떤 thread도 e와 e.next를 지울 수 없다.
-    * `add()`
-      * 비슷하게, e를 추가하고자 하면 (미래의) e.prev와 e.next를 잡는다.
-  * Optimistic Synch
-   * 순회 하다가, 대상이 되는 부분을 발견하면 lock을 잡고, 다시 순회하여 validation한다.
-     * e1과 e2에 lock을 걸었다면, e1이 accessible이고 e2가 e1.next이면 된다.
-   * 장점: Traversal이 wait-free이다. lock을 계속 잡는 것보다는 traversal을 2번하는 것이 싸다.
-   * 단점: 그래도 `contains()`는 lock을 잡는다. 근데 대부분의 경우 `contains()`의 호출이 가장 많다.
-  * Lazy Synch
-    * Optimistic과 비슷하게 Traversal에서 lock을 잡지 않는다. 그러나, Traversal은 1번만 수행하며, `contains()`는 lock을 잡지 않는다. `add()`나 `remove()`에서는 curr와 prev의 lock을 잡는데, 처음부터 다시 순회하는 것이 아니라 mark 여부를 확인하면 된다. 즉, prev가 access 가능한 지 체크하는 대신, prev와 curr의 mark 여부를 체크한다.
-    * Logical delete: `node.mark = DELETED;`
-    * Physical delete: `node.prev = node.next;`
-    * `contains()`는 wait-free이지만 여전히 `add()`나 `remove()`가 lock-free가 아니다. lock이 있으면 critical section에 들어간 thread를 항상 기다려야 한다...
-  * Lock-free Synch
-    * CAS와 Logical delete marking을 이용한다. 그런데 이를 한번에 하기 위해, Logical removal 자체를 next 포인터에다 대고 Bit masking한다. 그러면 누군가 Logical delete한 것을 CAS로 확인할 수 있다.
-    * `remove()`: a→b→c에서 b를 지운다고 하면, b에 marking하고 CAS(a.next, c)한다. CAS가 실패해도 b는 marking되어 있으므로 상관 업다.
+## Cocurrent object pattern
+* Coarse-Grained Synch: 그냥 lock 하나 잡고 critical section에서 수행한다.
+* Fine-Grained Synch: lock을 object의 여러 부분에 독립적으로 할당한다. 따라서 서로 병렬적으로 read/write될 수 있는 부분에서 경쟁이 발생하지 않게 한다.
+* Optimistic Synch: 일단 lock을 잡지 않고 search를 한다. read/write할 부분을 찾았다면 lock을 잡은 후, 검사한다. (search와 locking 사이의 update를 감지) 검사 결과 update가 있었다면 처음부터 다시 시도한다.
+  * fine-grained locking보다 싸지만, 실패 시 overhead가 크다.
+  * access pattern이 어떤가에 따라 시도해야 한다. 기본 overhead만 걸리는 case가 많은 경우에 쓰면 좋다.
+* Lazy Synch: Logical removal과 Physical removal으로 나눈다. Logical removal에서는 단순히 마킹을 하고, Physical removal에서는 실제로 지운다.
+* Lock-free Synch: CAS나 비슷한 연산을 사용한다. Robust but compex. 구현이 복잡하고, 종종 overhead가 크다.
+
+## Linked List: Set
+* 세 가지 연산 `add(x)`, `remove(x)`, `contains(x)`을 지원한다.
+* 앞뒤로 centinel node가 있고, 그 사이에 key들이 singly linked list로 연결된 구조를 생각하자.
+* Invariant (불변량)
+  * method 실행 전 후로 항상 보존되어야 하는 성질
+  * 예를 들어 정렬되어 있다, 중복이 없다, head to tail 경로가 존재한다 등등.
+* Hand-over-Hand locking - Fine-Grained Synch
+  * Linked list를 순회할 때, 각 node별로 lock을 할당하고 lock을 2개씩 잡는 것.
+  * `remove()`
+    * (lock을 하나만 잡을 때) { a, b, c, d }에서 b와 c를 각각 지우러 왔을 때, b를 지우기 위해 a→c를 연결하고 c를 지우기 위해 b→d를 연결해서 최종적으로 { a, c, d }가 되는 문제가 생긴다. b를 지울 때는 a에  lock을 잡고, c를 지울 때는 b에 lock을 잡아서 그렇다. 따라서 지우고자 하는 node의 lock도 잡아야 한다. 즉, b를 지울 때는 a와 b의 lock을 잡고, c를 지울 때는 b와 c의 lock을 잡는다.
+    * 정리: e를 지울 때, e.prev만 잡지 말고, e와 e.prev를 모두 잡는다. 거꾸로, 누군가 e를 잡고 있다면 다른 어떤 thread도 e와 e.next를 지울 수 없다.
+  * `add()`
+    * 비슷하게, e를 추가하고자 하면 (미래의) e.prev와 e.next를 잡는다.
+* Optimistic Synch
+  * 순회 하다가, 대상이 되는 부분을 발견하면 lock을 잡고, 다시 순회하여 validation한다.
+  * e1과 e2에 lock을 걸었다면, e1이 accessible이고 e2가 e1.next이면 된다.
+  * 장점: Traversal이 wait-free이다. lock을 계속 잡는 것보다는 traversal을 2번하는 것이 싸다.
+  * 단점: 그래도 `contains()`는 lock을 잡는다. 근데 대부분의 경우 `contains()`의 호출이 가장 많다.
+* Lazy Synch
+  * Optimistic과 비슷하게 Traversal에서 lock을 잡지 않는다. 그러나, Traversal은 1번만 수행하며, `contains()`는 lock을 잡지 않는다. `add()`나 `remove()`에서는 curr와 prev의 lock을 잡는데, 처음부터 다시 순회하는 것이 아니라 mark 여부를 확인하면 된다. 즉, prev가 access 가능한 지 체크하는 대신, prev와 curr의 mark 여부를 체크한다.
+  * Logical delete: `node.mark = DELETED;`
+  * Physical delete: `node.prev = node.next;`
+  * `contains()`는 wait-free이지만 여전히 `add()`나 `remove()`가 lock-free가 아니다. lock이 있으면 critical section에 들어간 thread를 항상 기다려야 한다...
+* Lock-free Synch
+  * CAS와 Logical delete marking을 이용한다. 그런데 이를 한번에 하기 위해, Logical removal 자체를 next 포인터에다 대고 Bit masking한다. 그러면 누군가 Logical delete한 것을 CAS로 확인할 수 있다.
+  * `remove()`: a→b→c에서 b를 지운다고 하면, b에 marking하고 CAS(a.next, c)한다. CAS가 실패해도 b는 marking되어 있으므로 상관이 없다.
 
 # 10. Concurrent Queues and the ABA Problem
 
