@@ -475,17 +475,32 @@ _TODO_
 # 10. Concurrent Queues and the ABA Problem
 
 ## Lock-free queue
-* Logical enqueue: CAS를 이용, 실패시 재시도한다.
-* Physical enqueue: CAS를 이용, 실패시 아무 것도 하지 않는다.
-* dequeue: CAS를 이용, 실패시 재시도한다.
+* Logical enqueue
+  * CAS를 이용해서 tail.next = new를 수행한다. 즉, 이를 수행하더라도 tail은 new.prev를 가리킨다. 실패시 재시도한다.
+* Physical enqueue
+  * CAS를 이용해서 tail = new를 수행한다. 즉, 이를 수행하면 tail이 실제로 new를 가리킨다. 실패시 아무 것도 하지 않는다.
+* dequeue
+  * head.next를 읽어오고, CAS를 이용해서 head = head.next를 수행한다. (head는 centinel을 가리키는 구조) 실패시 재시도한다.
 
 ## Bounded queue
 * `head → centinel → items... → last item ← tail`의 구조로 되어 있다.
 * deqLock과 enqLock을 사용한다. (일종의 fine-grained locking)
+  * deqLock: dequeue는 head를 가지고 수행하므로 enqueue와는 무관해 추가로 lock을 걸 필요는 없다.
+  * enqLock: enqueue는 tail을 가지고 수행하므로 dequeue와는 무관해 추가로 lock을 걸 필요는 없다.
 * permits = remain capacity (shared memory)
-  * 0: full, N: empty
-  * `enq() { GetAndDecrement(pemits) }`, `deq() { GetAndIncrement(permits) }`
-* permit과 lock의 update 순서는 상관 없다.
+  * 0: full → enqueue 실패, N: empty → dequeue 실패
+  * `enq() { GetAndDecrement(pemits) }`
+  * `deq() { GetAndIncrement(permits) }`
+  * permit와 lock의 update 순서는 상관 없다.
+  * permit 대신 size = MAX - permit를 쓰고, `enq()`와 `deq()`에서 증감을 반대로 해도 된다.
+* permit(counter)가 enqueuer와 dequeuer의 경쟁을 유발한다.
+  * counter를 enq용, deq용으로 2개 만든다.
+  * `enq() { GetAndDecrement(enqPermits) }`
+  * `deq() { GetAndIncrement(deqPermits) }`
+  * enqueuer가 실패하면 (= full) enqueuer가 deqLock을 잡아버리고, 다음을 수행한다.
+    * temp = deqPermits - enqPermits;
+    * deqPermits = temp;
+    * enqPermits = temp;
 
 ## Monitor lock
 * Lock + Condition
@@ -511,9 +526,12 @@ _TODO_
 
 ## Lock-free stack
 * `top → items... → centinel`의 구조로 되어 있다.
-* Logical push: node를 만들어 node.next = top을 수행한다.
-* Physical push: CAS로 top = node를 수행한다.
-* pop: 일단 read해온 다음, CAS로 top = top.next를 수행한다.
+* Logical push
+  * node를 만들어 node.next = top을 수행한다.
+* Physical push
+  * CAS로 top = node를 수행한다.
+* pop
+  * 일단 top.item를 읽은 다음, CAS로 top = top.next를 수행한다.
 * Lock-free queue와 마찬가지로 ABA problem이 생긴다.
 * 넣든 빼든 top에 경쟁이 생기므로 parallel하지 않다. concurrent하기만 하다.
   * cf. queue는 넣을 때랑 뺄 때는 각각 tail과 head에 접근하므로 parallel하다.
