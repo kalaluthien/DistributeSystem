@@ -439,7 +439,7 @@ _TODO_
 ## Cocurrent object pattern
 * Coarse-Grained Synch: 그냥 lock 하나 잡고 critical section에서 수행한다.
 * Fine-Grained Synch: lock을 object의 여러 부분에 독립적으로 할당한다. 따라서 서로 병렬적으로 read/write될 수 있는 부분에서 경쟁이 발생하지 않게 한다.
-* Optimistic Synch: double clean. 일단 lock을 잡지 않고 search한다. read/write할 부분을 찾았다면 lock을 잡은 후, validate한다. (search와 locking 사이의 update를 감지) 검사 결과 update가 있었다면 처음부터 retry한다.
+* Optimistic Synch: double clean. 일단 lock을 잡지 않고 read한다. write할 부분을 찾았다면 lock을 잡은 후, validate한다. (search와 locking 사이의 update를 감지) 검사 결과 update가 있었다면 처음부터 retry한다.
   * fine-grained locking보다 싸지만, 실패 시 overhead가 크다.
   * access pattern에 따라 적용해야 한다.
 * Lazy Synch: Logical removal과 Physical removal으로 나눈다. Logical removal에서는 단순히 마킹을 하고, Physical removal에서는 실제로 지운다.
@@ -476,11 +476,11 @@ _TODO_
 
 ## Lock-free queue
 * Logical enqueue
-  * CAS를 이용해서 tail.next = new를 수행한다. 즉, 이를 수행하더라도 tail은 new.prev를 가리킨다. 실패시 재시도한다.
+  * CAS를 이용해서 tail.next = new를 수행한다. 이를 수행하더라도 tail은 new.prev를 가리킨 채로 있다. 실패시 재시도한다.
 * Physical enqueue
-  * CAS를 이용해서 tail = new를 수행한다. 즉, 이를 수행하면 tail이 실제로 new를 가리킨다. 실패시 아무 것도 하지 않는다.
+  * CAS를 이용해서 tail = new (== tail.next)를 수행한다. 이를 수행하면 tail이 실제로 new를 가리킨다. 실패시 아무 것도 하지 않는다.
 * dequeue
-  * head.next를 읽어오고, CAS를 이용해서 head = head.next를 수행한다. (head는 centinel을 가리키는 구조) 실패시 재시도한다.
+  * head.next를 읽어오고, CAS를 이용해서 head = head.next를 수행한다. (head는 항상 centinel을 가리키는 구조) 실패시 재시도한다.
 
 ## Bounded queue
 * `head → centinel → items... → last item ← tail`의 구조로 되어 있다.
@@ -526,12 +526,12 @@ _TODO_
 
 ## Lock-free stack
 * `top → items... → centinel`의 구조로 되어 있다.
-* Logical push
-  * node를 만들어 node.next = top을 수행한다.
-* Physical push
-  * CAS로 top = node를 수행한다.
-* pop
-  * 일단 top.item를 읽은 다음, CAS로 top = top.next를 수행한다.
+* Logical `push()`
+  * node를 만들어 `node.next = top`을 수행한다.
+* Physical `push()`
+  * CAS로 `top = node`를 수행한다.
+* `pop()`
+  * 일단 `top.item`을 읽은 다음, CAS로 `top = top.next`를 수행한다.
 * Lock-free queue와 마찬가지로 ABA problem이 생긴다.
 * 넣든 빼든 top에 경쟁이 생기므로 parallel하지 않다. concurrent하기만 하다.
   * cf. queue는 넣을 때랑 뺄 때는 각각 tail과 head에 접근하므로 parallel하다.
@@ -555,31 +555,177 @@ _TODO_
 ## Combining tree
 * Concept
   * 둘씩 경쟁해서 stamp를 뽑아와서 트리 구조를 이룬다.
+  * 아무때나 막 와도 된다.
   * counter에서 range를 뽑아올 수 있다.
   * Linearizable하다. (Why?)
 * Combining Status
-  * IDLE, FIRST, SECOND, DONE, ROOT
+  * IDLE, FIRST, SECOND, DONE (RESULT), ROOT
 * Phases
-  * Precombining - IDLE이면 타고 올라가면서 FIRST로 바꾼다. FIRST이면 SECOND로 바꾸고 lock을 잡은 다음 끝낸다. ROOT이면 끝낸다. 어디까지 올라갔는지만 기록한다.
-  * Combining - SECOND이면 lock을 잡은 애는 자고, lock을 잡지 않은 애는 더해서 올라간다. FIRST이면 누가 못 올라오게 lock을 잡고 올라간다. 밟아 올라간 state를 모두 기록한다.
-  * Operation
-  * Distribution
+  * while (Precombining) → while (Combining) → Operation → while (Distribute)
+  * Precombining - IDLE이면 타고 올라가면서 FIRST로 바꾼다. FIRST이면 SECOND로 바꾸고 lock을 잡은 다음 끝낸다. ROOT이면 끝낸다. 자기가 '가지 못한' 최고점을 (stop) 기록한다. 만약 해당 node에서 Combining이 진행 중이었다면 (lock이 걸림) 끝날 때까지 기다린 후 Precombining을 진행한다.
+  * Combining - 자신의 Precombining이 끝난 후 최고점 (stop) 전까지 올라가면서 자신의 값(firstValue)에다 node에 combine된 값을 누적시킨다. FIRST이면 혼자 왔던 거니까 lock이 걸려있지 않고, lock을 걸어 SECOND 기회를 박탈한 다음 올라간다. SECOND이면 Precombining 중에 2번째 thread가 온 것이니까 2번째 thread가 lock을 풀어줄 때까지 기다렸다가 값(secondValue)을 더하고 lock을 걸고 올라간다. 밟아 올라간 state를 모두 기록한다. (스택을 사용함)
+  * Operation - 자신의 Combining이 끝난 후 stop이 ROOT이면 누적해온 값을 stop의 결과에 더하고 이전 결과(prior)를 받아온다. stop이 SECOND이면 다음을 수행한다.
+    * 1번째 thread에게 넘겨주기 위해 stop에 값(secondValue)을 저장
+    * Precombining에서 자기가 잡은 lock을 풀고 `notifyAll()` : lock을 풀면 이를 알림
+    * 상대 thread가 Distribution을 통해 결과(prior + firstValue)를 내주기를 기다림 (DONE, RESULT)
+    * Combining에서 상대가 잡은 lock을 풀고 `notifyAll()` 후 node를 IDLE로 만듦
+    * 결과를 받아옴
+  * Distribution - 결과를 받아온 후, Combining에서의 stack을 타고 내려오면서 FIRST이면 혼자 왔던 거니까 lock을 풀고 `notifyAll()`, SECOND이면 넘겨줄 결과를 내고 `notifyAll()`로 2번째 thread에게 이를 알린다. 2번째 thread는 Operation에서 이를 받아 알아서 lock을 풀고 결과를 가져간다.
 * Throughput
   * Ideal case: n thread가 동시에 오면 O(logn)만에 combining된다. (High contention)
-  * Worst case: n thread가 차례로 오는데 latancy가 O(logn)이므로 O(nlogn)이 된다. (Low contention)
+  * Worst case: n thread가 차례로 오는데 latancy가 트리 높이 O(logn)이므로 O(nlogn)이 된다. (Low contention)
   * Load fluctuation: 성능이 load 크기에 민감해서 막 출렁인다.
 
 ## Balancer
-_TODO_
+* Concept
+  * input wire로 들어오는 token들을 output wire에 적당히 분배한다.
+* Counting network
+  * input 수 = output 수 = 2인 블록을 막 붙여서 만든다.
+  * contention이 적고 throughput이 좋다. (depth가 (logn)^2)
+  * input이 많아서 sequential bottleneck이 없다.
+  * 병렬적으로 들어와도 잘 된다. Linearizable하지는 않지만 shared counter니까 아무래도 괜찮다.
+  * Quiescent consistent하게 step property를 만족한다. 어느 순서로 쌓일 지는 알 수 없으나, 다 쌓고 나면 step property를 만족한다는 의미이다.
+* Counting tree
+  * input 수 = 1, output 수 = 2인 트리를 막 붙여서 만든다.
+  * input이 1개라서 sequential bottleneck이 있다.
+  * Quiescent consistent하게 step property를 만족한다.
+* Diffracting tree
+  * Counting tree에서 각 node 앞에 prism을 붙여서 만든다.
+  * even number의 token이 들어오면 toggle해도 그대로이므로, 적당히 모아서 내보내면 병렬성이 증가된다.
+  * prism 크기는 root부터 K, K/2, K/4, ...
+  * 역시 contention이 적고 throughput이 좋다.
 
 # 13. Concurrent Hashing and Natural Parallelism
 
+## Hash Resizing
+  * `contains()` > `add()` > `remove()`이므로 중요도는 Growing > Shrinking이다.
+  * Policy는 적당히 global threshold와 bucket threshold를 잡는다.
+  * Fine-Grained Locking Resizing
+    * 문제점: bucket 별 lock을 전부 다 잡아버리고, 크기를 키운 다음 각 lock이 bucket을 2개씩 담당하게 하므로 사기치는 것이다. 사실상 그냥 Sequential하다.
+  * Lock-Free Resizing
+    * 문제점: CAS를 2번 써야 한다. (원래 bucket에서 꺼낼 때, 새 bucket에 넣을 때) 이 과정이 Atomic하지 않다.
+    * 해결책: item을 옮기지 말고 bucket을 옮기도록 하자.
+  * Recursive Split Ordering
+    * 모든 item들이 전체 LSB를 뒤집은 결과를 기준으로 정렬(Recursive Split Order)되어 하나의 Lock-Free list로 관리된다.
+    * modular LSB를 바로 읽은 결과(Hash)를 기준으로 bucket이 가리키도록 한다.
+    * 즉, list 자체는 LSB 00 10 01 11 순서로 정렬되어 있는데 bucket을 보면 LSB 00 01 10 11 순서로 들어있도록 한다. 이렇게 하는 이유는 나중에 추가된 bucket이 기존 bucket의 사이사이만 가리키도록 하면 되기 때문이다.
+    * 각 bucket별로 Sentinel Node를 갖도록 해주어야 한다. 그래야 CAS 1번으로 삭제를 할 수 있다.
+    * 그러면 이제 split할 때, CAS 2번으로 bucket과 sentinel을 끼워 넣을 수 있다. 우선 sentinel을 list에 추가하고, bucket이 sentinel을 가리키게 한다.
+
 # 14. Skiplists and Balanced Search
+
+## Skiplist
+* Skiplist의 특성
+  * 확률 요소가 포함된 Data Structure
+  * O(logn) 검색 시간
+  * 각 층이 아래 층의 sub-list이고, 맨 아래 층은 total-list이다.
+  * 듬성한 위 층부터 검색을 시작하여, base camp를 세우는 식으로 진행한다.
+* `Contains()`
+  * preds[LAYERS]와 succs[LAYERS]를 가지고 있다.
+  * Successful search
+    * i = N-1 to 0로 내려가면서... 다음과 같은 i가 있다.
+    * preds[i] < x
+    * succs[i] == x
+  * Unsuccessful search
+    * i = N-1 to 0로 내려가면서... 모든 i가 다음과 같다.
+    * preds[i] < x
+    * succs[i] > x
+* Lazy Skip List
+  * `Contains()`: Wait-free
+    * Logical remove 되지 않는 값을 똑같이 그냥 검색한다.
+  * `Add()`: Optimistic-lazy locking
+    * 새 node가 들어갈 pred를 모든 layer에 대해 찾는다.
+    * pred의 lock을 잡고 Validation을 한다.
+    * node를 끼워넣고 lock을 푼다.
+  * `Remove()`: Optimistic-lazy locking
+    * 지울 node의 pred를 모든 layer에 대해 찾고 node의 lock을 잡는다.
+    * Logical remove를 한다.
+    * pred의 lock을 잡고 Validation을 한다.
+    * Physical remove를 한다.
 
 # 15. Priority Queues
 
+## Tree-based bounded PQ
+* 작동 방식:
+  * `add(x, p)`: 왼쪽에서 올라갈 때는 +1 하고, 오른쪽에서 올라갈 때는 +0 한다.
+  * `deleteMin()`: 0이면 오른쪽으로 가고, 아니면 -1 하고 왼쪽으로 간다.
+* Update를 이곳 저곳에 하므로 linearizable하지는 않고, quiescent consistency하다.
+* 각 priority bin과 shared counter가 Lock-Free하다면 PQ 전체가 Lock-Free하다.
+
+## Heap-based unbounded PQ
+* 물론 heap은 이미 훌륭한 PQ이기 때문에 여기서 말하는 것은 당연히 concurrent heap이다.
+* Pointer-based Fine-grained이다.
+
 # 16. Futures, Scheduling, and Work Distribution
+
+## Time(n) notation
+* Definitions
+  * T<sub>1</sub>: 1 processor에서의 수행 시간 = Work
+  * T<sub>P</sub>: P processor에서의 수행 시간 (T<sub>P</sub> ≥ T<sub>1</sub> / P)
+  * T<sub>∞</sub>: ∞ processor에서의 수행 시간 = Critical path length (T<sub>P</sub> ≥ T<sub>∞</sub>)
+* Speedup on P processor
+  * T<sub>1</sub> / T<sub>P</sub>
+    * Linear speedup: T<sub>1</sub> / T<sub>P</sub> = θ(P)
+    * Max speedup: T<sub>1</sub> / T<sub>∞</sub>
+  * 적당히 마스터 정리로 T<sub>1</sub>(n)을 식 세워 풀고, T<sub>∞</sub>(n)을 식 세워 풀어서 나누어주면 Max speedup = Parallelism이 된다.
+  * Greedy scheduler: T<sub>P</sub> ≤ T<sub>1</sub> / P + T<sub>∞</sub>
 
 # 17. Barriers
 
+## Lock and Barrier
+* Lock은 aquire-release, Barrier는 release-aquire
+* Lock은 mutual-exclusion, Barrier는 phase-synchronization
+
+## Sense-Reversing Barrier
+* 배리어의 재사용을 위해서는 sense(일종의 flag)를 넣어주어야 한다. (odd phase, even phase를 구분)
+* 다른 thread를 기다려야 하는 경우 공용 sense에 대고 spin-lock을 돌고, 마지막으로 도착한 thread는 공용 sense를 toggle해준다. (getAndDecr(size) == 1) 
+
+## Combining Tree Barrier
+* Sense-Reversing Barrier를 그냥 둘씩 짝짓는 배리어이기 때문에 shared counter와는 다르다. 둘 중 먼저 도착한 쪽은 sense가 바뀌기를 기다리고, 나중에 도착한 쪽은 sense toggle과 size reset을 수행한다.
+* 당연히 memory contention이 적다. (각 공용 sense에 2 thread만 접근)
+
+## Tournament Tree Barrier
+* Combining Tree Barrier와 마찬가지로 둘씩 짝짓는 배리어이다. 그런데 CTB에서는 내가 먼저 왔는데 기다려야 하는 경우가 있다. 먼저 왔으면 빨리 빠져나가고 다음 것을 하고 싶을 수 있다.
+* 작동 방식:
+  * 각 경합 장소마다 미리 winner와 loser를 정해두고 각자의 flag를 준비한다. node가 총 N개면 flag는 2N개가 된다.
+  * Loser는 Winner의 flag에 write를 하고, Loser의 flag를 read를 하며 대기한다.
+  * Winner는 Winner의 flag에 read를 하며 대기하다가 위로 올라간다.
+  * 최후의 Winner는 root에서 Loser의 flag에 write를 하고 재귀적으로 내려간다.
+  * 대기하던 Loser는 Winner가 write를 해주면 재귀적으로 내려간다.
+
+## Dissemination Barrier
+* 각 Round `i`에서 thread `j`는 thread `(j + (1<<i)) % n`에게 메시지를 보내는 식으로, 서로 교차하면서 O(logn) Round를 거친다.
+* 예시: thread가 6개이면, ceil(log6) = 3 Round를 거친다.
+  * Round 1에서는 +1번 therad, Round 2에서는 +2번 thread, Round 3에서는 +4번 thread에 메시지를 전달한다.
+
 # 18. Transactional Memory
+
+## Hardware Transactional Memory (HTM)
+* `Commit()`되면 안전하고, 중간에 무슨 일이 생기면 `Abort()`하는 형태의 transaction이다.
+* Cache coherence protocol을 활용, L1 Cache의 일부를 transactional memory space로 이용한다.
+  * 구체적으로, Invalidation 기능, Consistency checking 기능, Speculative execution 기능이 필요하다. 앞의 2개는 Cache coherence을 활용하면 되고, 뒤의 1개는 특별히 필요한 건 없고 Branch prediction과 유사하게 만들면 된다. 어차피 최신 CPU에 다 있다.
+* Limitation of HTM
+  * Cache size - 작은 commit만 가능하다.
+  * Scheduling - 짧은 commit만 가능하다.
+  * Guarantees - 확실하지 못해서 abort handler가 필요하다.
+
+## Software Transactional Memory (STM)
+* 기본 용어:
+  * Read set과 Write set은 각각 read하는 곳의 주소 집합, write할 곳의 주소 집합이다.
+  * Deffered update - commit할 때 결과가 반영된다.
+    * Direct에 비해 Consistency 맞춰주기 쉽지만 Commit이 병목이 된다.
+  * Lazy conflict detection - commit할 때 충돌이 확인된다.
+    * Eager write/write, Lazy read/write와 같이 섞을 수 있다.
+* Encounter Order Locking (Undo Log)
+  * Undo Log, Version, Lock을 준비한다.
+  * Read: unlock 확인하여 read set에 넣는다.
+  * Write: lock 이후 write set에 넣는다.
+  * Validate: 
+* Commit Time Locking (Write Buffer)
+  * Read: 
+  * Write: 
+  * Validate: 
+* TL2 Algorithm (Global Clock)
+  * Read: 
+  * Write: 
+  * Validate: 
