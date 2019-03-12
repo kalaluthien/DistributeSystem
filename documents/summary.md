@@ -33,7 +33,7 @@
 * 두 스레드 i, j만 있는 경우
 * `flag[i]` : thread i가 진입하고자 함
 * `victim` : victim에 해당하는 thread는 진입할 수 없음
-* 초기 조건 : `flag[i] = true` 이고 `victim = i`
+* 초기 조건 : `flag[i] == true` 이고 `victim == i`
 * 진입 조건 : `flag[j] == faise` 또는 `victim == j`
 * Sequential할 때 : `flag[j] == false`이므로 진입
 * Concurrent할 때 : `victim`이 하나의 값만 가지므로, thread i와 j 중 하나가 진입
